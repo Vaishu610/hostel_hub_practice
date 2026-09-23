@@ -1,168 +1,688 @@
+
 package com.hostelhub.view;
 
+import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.QueryDocumentSnapshot;
+import com.google.cloud.firestore.QuerySnapshot;
+import com.hostelhub.config.FirebaseConfig;
+import com.hostelhub.controller.FirebaseAuthController;
+import com.hostelhub.dao.FirestoreWardenDao;
+import com.hostelhub.dao.NoticeDao;
+import com.hostelhub.dao.StudentRequestDao;
 import com.hostelhub.model.Student;
+import com.hostelhub.model.Warden;
 
-import javafx.animation.FadeTransition;
-import javafx.animation.ScaleTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.util.Duration;
+import javafx.stage.Stage;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class StudentDashboard {
 
-    public static void show(Student student) {
+    private static BorderPane root;
+    private static Student student;
+    private static boolean darkTheme = false;
+    private static String displayName;
 
-        BorderPane root = new BorderPane();
+    private static final NoticeDao noticeDao =
+            new NoticeDao();
+
+    private static final double HOSTEL_LATITUDE = 18.5204;
+    private static final double HOSTEL_LONGITUDE = 73.8567;
+    private static final double HOSTEL_RADIUS = 100;
+
+    private static final String PRIMARY = "#4F46E5";
+    private static final String PRIMARY_DARK = "#3730A3";
+    private static final String GREEN = "#16A34A";
+    private static final String RED = "#DC2626";
+    private static final String ORANGE = "#EA580C";
+    private static final String BLUE = "#2563EB";
+
+    public static void show(Student loggedStudent) {
+
+        student = loggedStudent;
+
+        displayName =
+                safe(
+                        student.getFullName()
+                );
+
+        root =
+                new BorderPane();
+
+        rebuild("dashboard");
+
+        Scene scene =
+                new Scene(
+                        root,
+                        1550,
+                        800
+                );
+
+        Stage stage =
+                Welcome.stage;
+
+        stage.setTitle(
+                "Hostel Hub - Student Dashboard"
+        );
+
+        stage.setScene(scene);
+
+        stage.setMaximized(true);
+
+        stage.show();
+    }
+
+    private static void rebuild(
+            String page
+    ) {
 
         root.setStyle(
-                "-fx-background-color: #090612;"
+                "-fx-background-color:" +
+                        bg() +
+                        ";"
+        );
+
+        root.setTop(
+                createTopBar()
         );
 
         root.setLeft(
-                createSidebar(root, student)
+                createSidebar()
         );
 
-        root.setCenter(
-                createDashboardContent(student)
-        );
+        switch (page) {
 
-        Scene scene =
-                new Scene(root, 1250, 750);
-
-        Welcome.stage.setScene(scene);
-
-        FadeTransition fade =
-                new FadeTransition(
-                        Duration.millis(500),
-                        root
+            case "settings":
+                root.setCenter(
+                        createSettingsPage()
                 );
+                break;
 
-        fade.setFromValue(0);
-        fade.setToValue(1);
-        fade.play();
+            case "profile":
+                root.setCenter(
+                        createProfilePage()
+                );
+                break;
+
+            case "room":
+                root.setCenter(
+                        createRoomPage()
+                );
+                break;
+
+            case "payments":
+                root.setCenter(
+                        createPaymentsPage()
+                );
+                break;
+
+            case "complaints":
+                root.setCenter(
+                        createComplaintsPage()
+                );
+                break;
+
+            case "mess":
+                root.setCenter(
+                        createMessPage()
+                );
+                break;
+
+            case "leave":
+                root.setCenter(
+                        createLeavePage()
+                );
+                break;
+
+            case "attendance":
+                root.setCenter(
+                        createAttendancePage()
+                );
+                break;
+
+            case "notices":
+                root.setCenter(
+                        createNoticesPage()
+                );
+                break;
+
+            case "services":
+                root.setCenter(
+                        createServicesPage()
+                );
+                break;
+
+            case "scholarship":
+                root.setCenter(
+                        createScholarshipPage()
+                );
+                break;
+
+            case "emergency":
+                root.setCenter(
+                        createEmergencyPage()
+                );
+                break;
+
+            default:
+                root.setCenter(
+                        createDashboardPage()
+                );
+                break;
+        }
     }
 
-    private static VBox createSidebar(
-            BorderPane root,
-            Student student
-    ) {
+    private static String bg() {
 
-        VBox sidebar =
-                new VBox(10);
+        return darkTheme
+                ? "#0F172A"
+                : "#F4F6FB";
+    }
 
-        sidebar.setPrefWidth(240);
+    private static String panel() {
 
-        sidebar.setPadding(
+        return darkTheme
+                ? "#1E293B"
+                : "#FFFFFF";
+    }
+
+    private static String card() {
+
+        return darkTheme
+                ? "#1E293B"
+                : "#FFFFFF";
+    }
+
+    private static String border() {
+
+        return darkTheme
+                ? "#334155"
+                : "#E5E7EB";
+    }
+
+    private static String text() {
+
+        return darkTheme
+                ? "#F8FAFC"
+                : "#111827";
+    }
+
+    private static String secondary() {
+
+        return darkTheme
+                ? "#CBD5E1"
+                : "#374151";
+    }
+
+    private static String muted() {
+
+        return darkTheme
+                ? "#94A3B8"
+                : "#6B7280";
+    }
+
+    private static String inputBg() {
+
+        return darkTheme
+                ? "#0F172A"
+                : "#F9FAFB";
+    }
+
+    private static HBox createTopBar() {
+
+        HBox bar =
+                new HBox(20);
+
+        bar.setAlignment(
+                Pos.CENTER_LEFT
+        );
+
+        bar.setPadding(
                 new Insets(
-                        28,
                         15,
-                        25,
-                        15
+                        30,
+                        15,
+                        30
                 )
         );
 
-        sidebar.setStyle(
-                "-fx-background-color: #110B1C;" +
-                "-fx-border-color: #241735;" +
-                "-fx-border-width: 0 1 0 0;"
+        bar.setStyle(
+                "-fx-background-color:" +
+                        panel() +
+                        ";" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-width:0 0 1 0;"
         );
 
         Label logo =
-                new Label("⌂  HOSTEL HUB");
+                new Label(
+                        "HOSTEL HUB"
+                );
 
         logo.setFont(
                 Font.font(
                         "Segoe UI",
                         FontWeight.BOLD,
-                        22
+                        23
                 )
         );
 
-        logo.setTextFill(Color.WHITE);
+        logo.setTextFill(
+                Color.web(PRIMARY)
+        );
 
-        sidebar.getChildren().add(logo);
+        Label small =
+                new Label(
+                        "  |  Student Portal"
+                );
 
-        sidebar.getChildren().add(
-                sectionLabel("MAIN")
+        small.setFont(
+                Font.font(
+                        "Segoe UI",
+                        13
+                )
+        );
+
+        small.setTextFill(
+                Color.web(muted())
+        );
+
+        HBox logoBox =
+                new HBox(
+                        logo,
+                        small
+                );
+
+        logoBox.setAlignment(
+                Pos.CENTER_LEFT
+        );
+
+        Region spacer =
+                new Region();
+
+        HBox.setHgrow(
+                spacer,
+                Priority.ALWAYS
+        );
+
+        Button notification =
+                new Button(
+                        "🔔"
+                );
+
+        notification.setPrefSize(
+                42,
+                42
+        );
+
+        notification.setStyle(
+                "-fx-background-color:" +
+                        (darkTheme
+                                ? "#312E81"
+                                : "#EEF2FF") +
+                        ";" +
+                        "-fx-background-radius:22;" +
+                        "-fx-font-size:17px;" +
+                        "-fx-cursor:hand;"
+        );
+
+        notification.setOnAction(
+                e -> showNotificationSummary()
+        );
+
+        Label profileIcon =
+                new Label(
+                        "👤"
+                );
+
+        profileIcon.setFont(
+                Font.font(25)
+        );
+
+        VBox info =
+                new VBox(2);
+
+        info.setAlignment(
+                Pos.CENTER_RIGHT
+        );
+
+        Label name =
+                new Label(
+                        displayName
+                );
+
+        name.setFont(
+                Font.font(
+                        "Segoe UI",
+                        FontWeight.BOLD,
+                        14
+                )
+        );
+
+        name.setTextFill(
+                Color.web(text())
+        );
+
+        Label role =
+                new Label(
+                        "Student"
+                );
+
+        role.setFont(
+                Font.font(
+                        "Segoe UI",
+                        11
+                )
+        );
+
+        role.setTextFill(
+                Color.web(muted())
+        );
+
+        info.getChildren().addAll(
+                name,
+                role
+        );
+
+        bar.getChildren().addAll(
+                logoBox,
+                spacer,
+                notification,
+                profileIcon,
+                info
+        );
+
+        return bar;
+    }
+
+    private static void showNotificationSummary() {
+
+        try {
+
+            StudentRequestDao dao =
+                    new StudentRequestDao();
+
+            List<Map<String, Object>> complaints =
+                    dao.getStudentComplaints(
+                            student.getUid()
+                    );
+
+            List<Map<String, Object>> leaves =
+                    dao.getStudentLeaveRequests(
+                            student.getUid()
+                    );
+
+            List<Map<String, Object>> emergencies =
+                    dao.getStudentEmergencies(
+                            student.getUid()
+                    );
+
+            int pendingComplaints = 0;
+            int pendingLeaves = 0;
+            int activeEmergencies = 0;
+
+            for (
+                    Map<String, Object> item :
+                    complaints
+            ) {
+
+                String status =
+                        safeObject(
+                                item.get("status"),
+                                "Pending"
+                        );
+
+                if (
+                        !isClosedComplaint(
+                                status
+                        )
+                ) {
+
+                    pendingComplaints++;
+                }
+            }
+
+            for (
+                    Map<String, Object> item :
+                    leaves
+            ) {
+
+                String status =
+                        safeObject(
+                                item.get("status"),
+                                "Pending"
+                        );
+
+                if (
+                        !isClosedLeave(
+                                status
+                        )
+                ) {
+
+                    pendingLeaves++;
+                }
+            }
+
+            for (
+                    Map<String, Object> item :
+                    emergencies
+            ) {
+
+                String status =
+                        safeObject(
+                                item.get("status"),
+                                "Urgent"
+                        );
+
+                if (
+                        !isClosedEmergency(
+                                status
+                        )
+                ) {
+
+                    activeEmergencies++;
+                }
+            }
+
+            showMessage(
+                    "🔔 Notifications\n\n" +
+                            "📝 Complaints : " +
+                            pendingComplaints +
+                            "\n📅 Leave Requests : " +
+                            pendingLeaves +
+                            "\n🆘 Emergency Alerts : " +
+                            activeEmergencies
+            );
+
+        } catch (Exception e) {
+
+            showMessage(
+                    "Unable to load notifications."
+            );
+        }
+    }
+
+    private static VBox createSidebar() {
+
+        VBox side =
+                new VBox(6);
+
+        side.setPrefWidth(225);
+
+        side.setPadding(
+                new Insets(
+                        25,
+                        14,
+                        20,
+                        14
+                )
+        );
+
+        side.setStyle(
+                "-fx-background-color:#111827;" +
+                        "-fx-border-color:" +
+                        (
+                                darkTheme
+                                        ? "#020617"
+                                        : "#111827"
+                        ) +
+                        ";" +
+                        "-fx-border-width:0 1 0 0;"
+        );
+
+        Label title =
+                new Label(
+                        "MAIN MENU"
+                );
+
+        title.setPadding(
+                new Insets(
+                        5,
+                        12,
+                        10,
+                        12
+                )
+        );
+
+        title.setFont(
+                Font.font(
+                        "Segoe UI",
+                        FontWeight.BOLD,
+                        11
+                )
+        );
+
+        title.setTextFill(
+                Color.web("#9CA3AF")
+        );
+
+        side.getChildren().add(
+                title
         );
 
         Button dashboard =
                 menuButton(
-                        "⌂",
+                        "🏠",
                         "Dashboard"
-                );
-
-        Button profile =
-                menuButton(
-                        "●",
-                        "My Profile"
                 );
 
         Button room =
                 menuButton(
-                        "▣",
+                        "🛏",
                         "My Room"
                 );
 
-        Button fees =
+        Button payments =
                 menuButton(
-                        "₹",
-                        "Fees & Payments"
+                        "💳",
+                        "Payments"
                 );
-
-        sidebar.getChildren().addAll(
-                dashboard,
-                profile,
-                room,
-                fees
-        );
-
-        sidebar.getChildren().add(
-                sectionLabel("SERVICES")
-        );
 
         Button complaints =
                 menuButton(
-                        "!",
+                        "📝",
                         "Complaints"
-                );
-
-        Button leave =
-                menuButton(
-                        "□",
-                        "Leave Application"
-                );
-
-        Button notices =
-                menuButton(
-                        "●",
-                        "Notices"
                 );
 
         Button mess =
                 menuButton(
-                        "◆",
+                        "🍽",
                         "Mess"
+                );
+
+        Button leave =
+                menuButton(
+                        "📅",
+                        "Leave"
                 );
 
         Button attendance =
                 menuButton(
-                        "✓",
+                        "📍",
                         "Attendance"
                 );
 
-        sidebar.getChildren().addAll(
+        Button notices =
+                menuButton(
+                        "📢",
+                        "Notices"
+                );
+
+        Button services =
+                menuButton(
+                        "🔧",
+                        "Services"
+                );
+
+        Button scholarship =
+                menuButton(
+                        "🎓",
+                        "Scholarship"
+                );
+
+        Button profile =
+                menuButton(
+                        "👤",
+                        "Profile"
+                );
+
+        Button emergency =
+                menuButton(
+                        "🆘",
+                        "Emergency"
+                );
+
+        side.getChildren().addAll(
+                dashboard,
+                room,
+                payments,
                 complaints,
-                leave,
-                notices,
                 mess,
-                attendance
+                leave,
+                attendance,
+                notices,
+                services,
+                scholarship,
+                profile,
+                emergency
         );
 
         Region spacer =
@@ -173,774 +693,1181 @@ public class StudentDashboard {
                 Priority.ALWAYS
         );
 
-        sidebar.getChildren().add(
-                spacer
-        );
+        Button settings =
+                menuButton(
+                        "⚙",
+                        "Settings"
+                );
 
         Button logout =
                 menuButton(
-                        "↪",
+                        "🚪",
                         "Logout"
                 );
 
-        sidebar.getChildren().add(
+        side.getChildren().addAll(
+                spacer,
+                settings,
                 logout
         );
 
-        dashboard.setOnAction(e ->
-                root.setCenter(
-                        createDashboardContent(student)
-                )
+        dashboard.setOnAction(
+                e -> rebuild("dashboard")
         );
 
-        profile.setOnAction(e ->
-                root.setCenter(
-                        createProfilePage(student)
-                )
+        room.setOnAction(
+                e -> rebuild("room")
         );
 
-        room.setOnAction(e ->
-                root.setCenter(
-                        createRoomPage(student)
-                )
+        payments.setOnAction(
+                e -> rebuild("payments")
         );
 
-        fees.setOnAction(e ->
-                root.setCenter(
-                        createFeesPage()
-                )
+        complaints.setOnAction(
+                e -> rebuild("complaints")
         );
 
-        complaints.setOnAction(e ->
-                root.setCenter(
-                        createComplaintsPage()
-                )
+        mess.setOnAction(
+                e -> rebuild("mess")
         );
 
-        leave.setOnAction(e ->
-                root.setCenter(
-                        createLeavePage()
-                )
+        leave.setOnAction(
+                e -> rebuild("leave")
         );
 
-        notices.setOnAction(e ->
-                root.setCenter(
-                        createNoticesPage()
-                )
+        attendance.setOnAction(
+                e -> rebuild("attendance")
         );
 
-        mess.setOnAction(e ->
-                root.setCenter(
-                        createMessPage()
-                )
+        notices.setOnAction(
+                e -> rebuild("notices")
         );
 
-        attendance.setOnAction(e ->
-                root.setCenter(
-                        createAttendancePage()
-                )
+        services.setOnAction(
+                e -> rebuild("services")
         );
 
-        logout.setOnAction(e ->
-                StudentLogin.show()
+        scholarship.setOnAction(
+                e -> rebuild("scholarship")
         );
 
-        return sidebar;
+        profile.setOnAction(
+                e -> rebuild("profile")
+        );
+
+        emergency.setOnAction(
+                e -> rebuild("emergency")
+        );
+
+        settings.setOnAction(
+                e -> rebuild("settings")
+        );
+
+        logout.setOnAction(
+                e -> StudentLogin.show()
+        );
+
+        return side;
     }
 
-    private static VBox createDashboardContent(
-            Student student
-    ) {
+    private static ScrollPane createDashboardPage() {
 
         VBox content =
-                new VBox(25);
+                new VBox(22);
 
         content.setPadding(
                 new Insets(
                         30,
                         35,
-                        30,
+                        40,
                         35
                 )
         );
 
-        Label welcome =
-                new Label(
-                        "Good Morning, "
-                                + safe(
-                                        student.getFullName()
-                                )
-                                + " 👋"
-                );
+        content.getChildren().addAll(
 
-        welcome.setFont(
-                Font.font(
-                        "Segoe UI",
-                        FontWeight.BOLD,
-                        30
+                pageText(
+                        "Welcome, " +
+                                displayName +
+                                " 👋",
+                        30,
+                        true,
+                        text()
+                ),
+
+                pageText(
+                        "Here's your hostel overview.",
+                        14,
+                        false,
+                        muted()
                 )
         );
 
-        welcome.setTextFill(
-                Color.WHITE
-        );
+        Map<String, Object> feeData =
+                getFeeData();
 
-        Label subtitle =
-                new Label(
-                        "Here's what's happening with your hostel account."
+        double totalFees =
+                getDouble(
+                        feeData,
+                        "totalFees"
                 );
 
-        subtitle.setTextFill(
-                Color.web("#A99CB8")
-        );
+        double paidFees =
+                getDouble(
+                        feeData,
+                        "paidFees"
+                );
 
-        content.getChildren().add(
-                new VBox(
-                        5,
-                        welcome,
-                        subtitle
-                )
-        );
+        double pendingFees =
+                getDouble(
+                        feeData,
+                        "pendingFees"
+                );
+
+        String feeStatus =
+                safeObject(
+                        feeData.get("feeStatus"),
+                        "PENDING"
+                );
+
+        List<Map<String, Object>> attendanceData =
+                getAttendanceData();
+
+        double attendancePercentage =
+                calculateAttendancePercentage(
+                        attendanceData
+                );
+
+        int pendingLeaves =
+                getPendingLeaveCount();
 
         HBox cards =
                 new HBox(18);
 
+        VBox room =
+                dashboardCard(
+                        "🛏",
+                        "MY ROOM",
+                        safe(
+                                student.getRoomNumber()
+                        ),
+                        safe(
+                                student.getRoomPreference()
+                        ),
+                        BLUE
+                );
+
+        VBox fee =
+                dashboardCard(
+                        "💳",
+                        "PENDING FEES",
+                        formatCurrency(
+                                pendingFees
+                        ),
+                        pendingFees > 0
+                                ? feeStatus
+                                : "All fees paid",
+                        GREEN
+                );
+
+        VBox leave =
+                dashboardCard(
+                        "📅",
+                        "LEAVE STATUS",
+                        pendingLeaves > 0
+                                ? pendingLeaves +
+                                " Pending"
+                                : "Clear",
+                        pendingLeaves > 0
+                                ? "Awaiting warden approval"
+                                : "No pending request",
+                        PRIMARY
+                );
+
+        VBox attendance =
+                dashboardCard(
+                        "📊",
+                        "ATTENDANCE",
+                        String.format(
+                                "%.0f%%",
+                                attendancePercentage
+                        ),
+                        attendanceData.isEmpty()
+                                ? "No records available"
+                                : "Based on attendance",
+                        GREEN
+                );
+
+        fee.setOnMouseClicked(
+                e -> openPaymentPage()
+        );
+
+        leave.setOnMouseClicked(
+                e -> rebuild("leave")
+        );
+
+        attendance.setOnMouseClicked(
+                e -> rebuild("attendance")
+        );
+
         cards.getChildren().addAll(
-
-                statCard(
-                        "COURSE",
-                        safe(student.getCourse()),
-                        safe(student.getYear()),
-                        "◆"
-                ),
-
-                statCard(
-                        "PHONE",
-                        safe(student.getPhone()),
-                        safe(student.getCity()),
-                        "☎"
-                ),
-
-                statCard(
-                        "ROOM",
-                        "Not Assigned",
-                        safe(student.getRoomPreference()),
-                        "▣"
-                ),
-
-                statCard(
-                        "GENDER",
-                        safe(student.getGender()),
-                        "Student",
-                        "●"
-                )
+                room,
+                fee,
+                leave,
+                attendance
         );
 
         content.getChildren().add(
                 cards
         );
 
-        Label quickTitle =
-                new Label("Quick Actions");
+        HBox analytics =
+                new HBox(
+                        20,
+                        createAttendanceChart(
+                                attendanceData
+                        ),
+                        createFeeStatus(
+                                totalFees,
+                                paidFees,
+                                pendingFees,
+                                feeStatus
+                        )
+                );
 
-        quickTitle.setFont(
-                Font.font(
-                        "Segoe UI",
-                        FontWeight.BOLD,
-                        20
-                )
+        HBox.setHgrow(
+                analytics.getChildren().get(0),
+                Priority.ALWAYS
         );
 
-        quickTitle.setTextFill(
-                Color.WHITE
+        HBox.setHgrow(
+                analytics.getChildren().get(1),
+                Priority.ALWAYS
         );
 
-        HBox quickActions =
-                new HBox(15);
-
-        quickActions.getChildren().addAll(
-
-                quickButton(
-                        "📝  Raise Complaint"
-                ),
-
-                quickButton(
-                        "📅  Apply Leave"
-                ),
-
-                quickButton(
-                        "💳  Pay Fees"
-                ),
-
-                quickButton(
-                        "👤  View Profile"
-                )
-        );
-
-        content.getChildren().addAll(
-                quickTitle,
-                quickActions
+        content.getChildren().add(
+                analytics
         );
 
         HBox lower =
-                new HBox(20);
+                new HBox(
+                        20,
+                        createAnnouncements(),
+                        createTodayMenu()
+                );
 
-        lower.getChildren().addAll(
+        HBox.setHgrow(
+                lower.getChildren().get(0),
+                Priority.ALWAYS
+        );
 
-                panel(
-                        "Student Information",
-
-                        "Name: "
-                                + safe(
-                                        student.getFullName()
-                                ),
-
-                        "Email: "
-                                + safe(
-                                        student.getEmail()
-                                ),
-
-                        "College: "
-                                + safe(
-                                        student.getCollege()
-                                ),
-
-                        "City: "
-                                + safe(
-                                        student.getCity()
-                                )
-                ),
-
-                panel(
-                        "Personal Information",
-
-                        "Parent: "
-                                + safe(
-                                        student.getParentName()
-                                ),
-
-                        "Date of Birth: "
-                                + safe(
-                                        student.getDateOfBirth()
-                                ),
-
-                        "Room Preference: "
-                                + safe(
-                                        student.getRoomPreference()
-                                ),
-                        "Room Number: " + safe(student.getRoomNumber()),
-                        "Address: "
-                                + safe(
-                                        student.getAddress()
-                                )
-                )
+        HBox.setHgrow(
+                lower.getChildren().get(1),
+                Priority.ALWAYS
         );
 
         content.getChildren().add(
                 lower
         );
 
-        return content;
-    }
-
-    private static VBox statCard(
-            String title,
-            String value,
-            String sub,
-            String icon
-    ) {
-
-        VBox card =
-                new VBox(8);
-
-        card.setPrefWidth(205);
-
-        card.setPadding(
-                new Insets(20)
-        );
-
-        card.setStyle(
-                "-fx-background-color: #151022;" +
-                "-fx-background-radius: 18px;" +
-                "-fx-border-color: #2C1D3F;" +
-                "-fx-border-radius: 18px;"
-        );
-
-        Label iconLabel =
-                new Label(icon);
-
-        iconLabel.setTextFill(
-                Color.web("#A064FF")
-        );
-
-        iconLabel.setFont(
-                Font.font(22)
-        );
-
-        Label titleLabel =
-                new Label(title);
-
-        titleLabel.setTextFill(
-                Color.web("#91849F")
-        );
-
-        titleLabel.setFont(
-                Font.font(
-                        "Segoe UI",
-                        FontWeight.BOLD,
-                        11
+        content.getChildren().add(
+                sectionTitle(
+                        "Quick Actions"
                 )
         );
 
-        Label valueLabel =
-                new Label(value);
+        HBox quick =
+                new HBox(15);
 
-        valueLabel.setTextFill(
-                Color.WHITE
+        Button complaint =
+                quickButton(
+                        "📝",
+                        "New Complaint",
+                        ORANGE
+                );
+
+        Button leaveBtn =
+                quickButton(
+                        "📅",
+                        "Apply Leave",
+                        PRIMARY
+                );
+
+        Button att =
+                quickButton(
+                        "📍",
+                        "Attendance",
+                        GREEN
+                );
+
+        Button emerg =
+                quickButton(
+                        "🆘",
+                        "Emergency",
+                        RED
+                );
+
+        Button prof =
+                quickButton(
+                        "👤",
+                        "My Profile",
+                        BLUE
+                );
+
+        complaint.setOnAction(
+                e -> rebuild("complaints")
         );
 
-        valueLabel.setFont(
-                Font.font(
-                        "Segoe UI",
-                        FontWeight.BOLD,
-                        20
+        leaveBtn.setOnAction(
+                e -> rebuild("leave")
+        );
+
+        att.setOnAction(
+                e -> rebuild("attendance")
+        );
+
+        emerg.setOnAction(
+                e -> rebuild("emergency")
+        );
+
+        prof.setOnAction(
+                e -> rebuild("profile")
+        );
+
+        quick.getChildren().addAll(
+                complaint,
+                leaveBtn,
+                att,
+                emerg,
+                prof
+        );
+
+        content.getChildren().add(
+                quick
+        );
+
+        content.getChildren().add(
+                sectionTitle(
+                        "Recent Activity"
                 )
         );
 
-        valueLabel.setWrapText(true);
-
-        Label subLabel =
-                new Label(sub);
-
-        subLabel.setTextFill(
-                Color.web("#A99CB8")
+        content.getChildren().add(
+                createRecentActivity()
         );
 
-        subLabel.setWrapText(true);
-
-        card.getChildren().addAll(
-                iconLabel,
-                titleLabel,
-                valueLabel,
-                subLabel
-        );
-
-        return card;
+        return createScroll(content);
     }
 
-    private static Button quickButton(
-            String text
-    ) {
+    private static void openPaymentPage() {
 
-        Button button =
-                new Button(text);
+        try {
 
-        button.setPrefWidth(190);
+            PaymentPage paymentPage =
+                    new PaymentPage(student);
 
-        button.setPrefHeight(50);
+            paymentPage.show(student);
 
-        button.setStyle(
-                "-fx-background-color: #181027;" +
-                "-fx-text-fill: white;" +
-                "-fx-font-family: 'Segoe UI';" +
-                "-fx-font-size: 13px;" +
-                "-fx-background-radius: 14px;" +
-                "-fx-border-color: #352451;" +
-                "-fx-border-radius: 14px;" +
-                "-fx-cursor: hand;"
-        );
+        } catch (Exception e) {
 
-        button.setOnMouseEntered(e ->
-                scale(button, 1.04)
-        );
+            e.printStackTrace();
 
-        button.setOnMouseExited(e ->
-                scale(button, 1)
-        );
-
-        return button;
+            showMessage(
+                    "Unable to open payment page."
+            );
+        }
     }
 
-    private static VBox panel(
-            String title,
-            String... items
+    private static VBox createAttendanceChart(
+            List<Map<String, Object>> attendanceData
     ) {
 
         VBox box =
-                new VBox(15);
+                whitePanel();
 
-        box.setPrefWidth(430);
+        box.setPrefWidth(600);
 
-        box.setPadding(
-                new Insets(22)
-        );
+        box.getChildren().addAll(
 
-        box.setStyle(
-                "-fx-background-color: #151022;" +
-                "-fx-background-radius: 18px;" +
-                "-fx-border-color: #2C1D3F;" +
-                "-fx-border-radius: 18px;"
-        );
+                sectionTitle(
+                        "📊 Attendance"
+                ),
 
-        Label heading =
-                new Label(title);
-
-        heading.setTextFill(
-                Color.WHITE
-        );
-
-        heading.setFont(
-                Font.font(
-                        "Segoe UI",
-                        FontWeight.BOLD,
-                        18
+                settingDescription(
+                        "Your latest attendance records"
                 )
         );
 
-        box.getChildren().add(
-                heading
-        );
+        if (
+                attendanceData.isEmpty()
+        ) {
 
-        for (String item : items) {
-
-            Label label =
-                    new Label(
-                            "•  " + item
-                    );
-
-            label.setWrapText(true);
-
-            label.setTextFill(
-                    Color.web("#B8AFC2")
-            );
-
-            label.setFont(
-                    Font.font(
-                            "Segoe UI",
-                            13
+            box.getChildren().add(
+                    infoLabel(
+                            "No attendance records available."
                     )
             );
 
+            return box;
+        }
+
+        Map<String, Integer> dayMap =
+                new HashMap<>();
+
+        for (
+                Map<String, Object> record :
+                attendanceData
+        ) {
+
+            String date =
+                    safeObject(
+                            record.get("date"),
+                            ""
+                    );
+
+            try {
+
+                LocalDate localDate =
+                        LocalDate.parse(date);
+
+                String day =
+                        localDate
+                                .getDayOfWeek()
+                                .toString()
+                                .substring(0, 3);
+
+                dayMap.put(
+                        day,
+                        dayMap.getOrDefault(
+                                day,
+                                0
+                        ) + 1
+                );
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        CategoryAxis xAxis =
+                new CategoryAxis();
+
+        NumberAxis yAxis =
+                new NumberAxis(
+                        0,
+                        1,
+                        1
+                );
+
+        xAxis.setLabel("Day");
+        yAxis.setLabel("Present");
+
+        BarChart<String, Number> chart =
+                new BarChart<>(
+                        xAxis,
+                        yAxis
+                );
+
+        chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        chart.setPrefHeight(240);
+
+        XYChart.Series<String, Number> series =
+                new XYChart.Series<>();
+
+        String[] days = {
+                "MON",
+                "TUE",
+                "WED",
+                "THU",
+                "FRI",
+                "SAT",
+                "SUN"
+        };
+
+        for (
+                String day :
+                days
+        ) {
+
+            series.getData().add(
+                    new XYChart.Data<>(
+                            day,
+                            dayMap.getOrDefault(
+                                    day,
+                                    0
+                            ) > 0
+                                    ? 1
+                                    : 0
+                    )
+            );
+        }
+
+        chart.getData().add(series);
+
+        box.getChildren().add(
+                chart
+        );
+
+        return box;
+    }
+
+    private static VBox createFeeStatus(
+            double totalFees,
+            double paidFees,
+            double pendingFees,
+            String feeStatus
+    ) {
+
+        VBox box =
+                whitePanel();
+
+        double progressValue =
+                totalFees > 0
+                        ? Math.min(
+                                1,
+                                paidFees / totalFees
+                        )
+                        : 0;
+
+        ProgressBar progress =
+                new ProgressBar(
+                        progressValue
+                );
+
+        progress.setMaxWidth(
+                Double.MAX_VALUE
+        );
+
+        progress.setPrefHeight(15);
+
+        box.getChildren().addAll(
+
+                sectionTitle(
+                        "💳 Fee Status"
+                ),
+
+                pageText(
+                        formatCurrency(
+                                totalFees
+                        ),
+                        30,
+                        true,
+                        text()
+                ),
+
+                pageText(
+                        "Total Hostel Fees",
+                        13,
+                        false,
+                        muted()
+                ),
+
+                progress,
+
+                pageText(
+                        formatCurrency(
+                                paidFees
+                        ) +
+                                " Paid",
+                        15,
+                        true,
+                        GREEN
+                ),
+
+                pageText(
+                        formatCurrency(
+                                pendingFees
+                        ) +
+                                " Pending",
+                        15,
+                        true,
+                        pendingFees > 0
+                                ? RED
+                                : GREEN
+                ),
+
+                pageText(
+                        "Status : " +
+                                safe(feeStatus),
+                        13,
+                        true,
+                        pendingFees > 0
+                                ? RED
+                                : GREEN
+                )
+        );
+
+        Region spacer =
+                new Region();
+
+        VBox.setVgrow(
+                spacer,
+                Priority.ALWAYS
+        );
+
+        Button pay =
+                primaryButton(
+                        pendingFees > 0
+                                ? "PAY FEES"
+                                : "VIEW PAYMENT"
+                );
+
+        pay.setOnAction(
+                e -> openPaymentPage()
+        );
+
+        box.getChildren().addAll(
+                spacer,
+                pay
+        );
+
+        return box;
+    }
+
+    private static VBox createAnnouncements() {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "📢 Latest Notices"
+                )
+        );
+
+        try {
+
+            List<Map<String, Object>> notices =
+                    noticeDao.getNotices();
+
+            notices.sort(
+                    (a, b) -> {
+
+                        Object first =
+                                a.get("createdAt");
+
+                        Object second =
+                                b.get("createdAt");
+
+                        if (
+                                first == null &&
+                                second == null
+                        ) {
+                            return 0;
+                        }
+
+                        if (first == null) {
+                            return 1;
+                        }
+
+                        if (second == null) {
+                            return -1;
+                        }
+
+                        return String.valueOf(second)
+                                .compareTo(
+                                        String.valueOf(first)
+                                );
+                    }
+            );
+
+            int count = 0;
+
+            for (
+                    Map<String, Object> notice :
+                    notices
+            ) {
+
+                String title =
+                        safeValue(
+                                safeObject(
+                                        notice.get("title"),
+                                        "Notice"
+                                ),
+                                "Notice"
+                        );
+
+                String message =
+                        safeValue(
+                                safeObject(
+                                        notice.get("message"),
+                                        ""
+                                ),
+                                ""
+                        );
+
+                box.getChildren().add(
+                        announcement(
+                                title,
+                                message
+                        )
+                );
+
+                count++;
+
+                if (count >= 5) {
+                    break;
+                }
+            }
+
+            if (count == 0) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "No notices available."
+                        )
+                );
+            }
+
+        } catch (Exception e) {
+
             box.getChildren().add(
-                    label
+                    infoLabel(
+                            "Unable to load notices."
+                    )
+            );
+        }
+
+        Button view =
+                secondaryButton(
+                        "VIEW ALL NOTICES"
+                );
+
+        view.setOnAction(
+                e -> rebuild("notices")
+        );
+
+        box.getChildren().add(
+                view
+        );
+
+        return box;
+    }
+
+    private static VBox createTodayMenu() {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "🍽 Today's Menu"
+                )
+        );
+
+        try {
+
+            DocumentSnapshot doc =
+                    FirebaseConfig
+                            .getFireStore()
+                            .collection("messMenu")
+                            .document(
+                                    LocalDate.now()
+                                            .toString()
+                            )
+                            .get()
+                            .get();
+
+            if (!doc.exists()) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "Today's menu has not been updated."
+                        )
+                );
+
+            } else {
+
+                box.getChildren().addAll(
+
+                        menuRow(
+                                "🌅",
+                                "Breakfast",
+                                safeValue(
+                                        doc.getString(
+                                                "breakfast"
+                                        ),
+                                        "Not updated"
+                                )
+                        ),
+
+                        menuRow(
+                                "☀",
+                                "Lunch",
+                                safeValue(
+                                        doc.getString(
+                                                "lunch"
+                                        ),
+                                        "Not updated"
+                                )
+                        ),
+
+                        menuRow(
+                                "☕",
+                                "Snacks",
+                                safeValue(
+                                        doc.getString(
+                                                "snacks"
+                                        ),
+                                        "Not updated"
+                                )
+                        ),
+
+                        menuRow(
+                                "🌙",
+                                "Dinner",
+                                safeValue(
+                                        doc.getString(
+                                                "dinner"
+                                        ),
+                                        "Not updated"
+                                )
+                        )
+                );
+            }
+
+        } catch (Exception e) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "Unable to load today's menu."
+                    )
             );
         }
 
         return box;
     }
 
-    private static VBox createProfilePage(
-            Student student
-    ) {
+    private static VBox createRecentActivity() {
+
+        VBox box =
+                whitePanel();
+
+        try {
+
+            StudentRequestDao dao =
+                    new StudentRequestDao();
+
+            List<Map<String, Object>> complaints =
+                    dao.getStudentComplaints(
+                            student.getUid()
+                    );
+
+            List<Map<String, Object>> leaves =
+                    dao.getStudentLeaveRequests(
+                            student.getUid()
+                    );
+
+            List<Map<String, Object>> emergencies =
+                    dao.getStudentEmergencies(
+                            student.getUid()
+                    );
+
+            int count = 0;
+
+            for (
+                    Map<String, Object> item :
+                    complaints
+            ) {
+
+                if (count >= 5) {
+                    break;
+                }
+
+                box.getChildren().add(
+                        activityRow(
+                                "📝",
+                                "Complaint • " +
+                                        safeObject(
+                                                item.get("category"),
+                                                "General"
+                                        ),
+                                safeObject(
+                                        item.get("status"),
+                                        "Pending"
+                                )
+                        )
+                );
+
+                count++;
+            }
+
+            for (
+                    Map<String, Object> item :
+                    leaves
+            ) {
+
+                if (count >= 5) {
+                    break;
+                }
+
+                box.getChildren().add(
+                        activityRow(
+                                "📅",
+                                "Leave Request • " +
+                                        safeObject(
+                                                item.get(
+                                                        "leaveType"
+                                                ),
+                                                "Leave"
+                                        ),
+                                safeObject(
+                                        item.get("status"),
+                                        "Pending"
+                                )
+                        )
+                );
+
+                count++;
+            }
+
+            for (
+                    Map<String, Object> item :
+                    emergencies
+            ) {
+
+                if (count >= 5) {
+                    break;
+                }
+
+                box.getChildren().add(
+                        activityRow(
+                                "🆘",
+                                "Emergency • " +
+                                        safeObject(
+                                                item.get(
+                                                        "emergencyType"
+                                                ),
+                                                "Emergency"
+                                        ),
+                                safeObject(
+                                        item.get("status"),
+                                        "Urgent"
+                                )
+                        )
+                );
+
+                count++;
+            }
+
+            if (count == 0) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "No recent activity."
+                        )
+                );
+            }
+
+        } catch (Exception e) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "Unable to load recent activity."
+                    )
+            );
+        }
+
+        return box;
+    }
+
+    private static ScrollPane createPaymentsPage() {
 
         VBox content =
-                pageContainer(
-                        "My Profile",
-                        "Your registered student information."
+                new VBox(20);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        Map<String, Object> feeData =
+                getFeeData();
+
+        double total =
+                getDouble(
+                        feeData,
+                        "totalFees"
                 );
 
-        GridPane grid =
-                new GridPane();
-
-        grid.setHgap(20);
-
-        grid.setVgap(15);
-
-        TextField name =
-                input(
-                        "Full Name",
-                        safe(student.getFullName())
+        double paid =
+                getDouble(
+                        feeData,
+                        "paidFees"
                 );
 
-        TextField phone =
-                input(
-                        "Phone Number",
-                        safe(student.getPhone())
+        double pending =
+                getDouble(
+                        feeData,
+                        "pendingFees"
                 );
 
-        TextField email =
-                input(
-                        "Email",
-                        safe(student.getEmail())
+        String status =
+                safeObject(
+                        feeData.get("feeStatus"),
+                        "PENDING"
                 );
-
-        TextField parent =
-                input(
-                        "Parent Name",
-                        safe(student.getParentName())
-                );
-
-        TextField dob =
-                input(
-                        "Date of Birth",
-                        safe(student.getDateOfBirth())
-                );
-
-        TextField gender =
-                input(
-                        "Gender",
-                        safe(student.getGender())
-                );
-
-        TextField course =
-                input(
-                        "Course",
-                        safe(student.getCourse())
-                );
-
-        TextField year =
-                input(
-                        "Year",
-                        safe(student.getYear())
-                );
-
-        TextField college =
-                input(
-                        "College",
-                        safe(student.getCollege())
-                );
-
-        TextField city =
-                input(
-                        "City",
-                        safe(student.getCity())
-                );
-
-        TextField roomPreference =
-                input(
-                        "Room Preference",
-                        safe(student.getRoomPreference())
-                );
-
-        TextField address =
-                input(
-                        "Address",
-                        safe(student.getAddress())
-                );
-
-        addProfileField(
-                grid,
-                "Full Name",
-                name,
-                0,
-                0
-        );
-
-        addProfileField(
-                grid,
-                "Phone",
-                phone,
-                1,
-                0
-        );
-
-        addProfileField(
-                grid,
-                "Email",
-                email,
-                0,
-                2
-        );
-
-        addProfileField(
-                grid,
-                "Parent Name",
-                parent,
-                1,
-                2
-        );
-
-        addProfileField(
-                grid,
-                "Date of Birth",
-                dob,
-                0,
-                4
-        );
-
-        addProfileField(
-                grid,
-                "Gender",
-                gender,
-                1,
-                4
-        );
-
-        addProfileField(
-                grid,
-                "Course",
-                course,
-                0,
-                6
-        );
-
-        addProfileField(
-                grid,
-                "Year",
-                year,
-                1,
-                6
-        );
-
-        addProfileField(
-                grid,
-                "College",
-                college,
-                0,
-                8
-        );
-
-        addProfileField(
-                grid,
-                "City",
-                city,
-                1,
-                8
-        );
-
-        addProfileField(
-                grid,
-                "Room Preference",
-                roomPreference,
-                0,
-                10
-        );
-
-        addProfileField(
-                grid,
-                "Address",
-                address,
-                1,
-                10
-        );
-
-        Button save =
-                primaryButton(
-                        "SAVE CHANGES"
-                );
-
-        save.setOnAction(e ->
-                showMessage(
-                        "Profile updated successfully."
-                )
-        );
-
-        content.getChildren().addAll(
-                grid,
-                save
-        );
-
-        return content;
-    }
-
-    private static void addProfileField(
-            GridPane grid,
-            String labelText,
-            TextField field,
-            int col,
-            int row
-    ) {
-
-        grid.add(
-                fieldLabel(labelText),
-                col,
-                row
-        );
-
-        grid.add(
-                field,
-                col,
-                row + 1
-        );
-    }
-
-    private static VBox createRoomPage(
-            Student student
-    ) {
-
-        return pageContainer(
-                "My Room",
-                "Your current hostel room information.",
-                panel(
-                        "Room Details",
-                        "Student: "
-                                + safe(
-                                        student.getFullName()
-                                ),
-                        "Room Preference: "
-                                + safe(
-                                        student.getRoomPreference()
-                                ),
-                        "Room Number: Not Assigned",
-                        "Building: Not Assigned",
-                        "Floor: Not Assigned",
-                        "Bed Number: Not Assigned",
-                        "Roommate: Not Assigned"
-                )
-        );
-    }
-
-    private static VBox createFeesPage() {
-
-        VBox content =
-                pageContainer(
-                        "Fees & Payments",
-                        "Manage your hostel fee payments."
-                );
-
-        HBox cards =
-                new HBox(18);
-
-        cards.getChildren().addAll(
-
-                statCard(
-                        "TOTAL FEES",
-                        "₹25,000",
-                        "Academic Year",
-                        "₹"
-                ),
-
-                statCard(
-                        "PAID",
-                        "₹18,500",
-                        "Completed",
-                        "✓"
-                ),
-
-                statCard(
-                        "REMAINING",
-                        "₹6,500",
-                        "Due Amount",
-                        "!"
-                )
-        );
 
         Button pay =
                 primaryButton(
-                        "PAY REMAINING FEES"
+                        pending > 0
+                                ? "PAY FEES"
+                                : "VIEW PAYMENT"
                 );
 
-        pay.setOnAction(e ->
-                showMessage(
-                        "Payment gateway will open here."
-                )
+        pay.setOnAction(
+                e -> openPaymentPage()
         );
 
         content.getChildren().addAll(
-                cards,
-                pay
+
+                pageHeading(
+                        "💳 Payments",
+                        "Manage your hostel fee payments."
+                ),
+
+                infoPanel(
+                        "Fee Summary",
+                        "Total Fees : " +
+                                formatCurrency(total),
+                        "Paid Fees : " +
+                                formatCurrency(paid),
+                        "Remaining Fees : " +
+                                formatCurrency(pending),
+                        "Payment Status : " +
+                                status
+                ),
+
+                pay,
+
+                createPaymentHistory()
         );
 
-        return content;
+        return createScroll(content);
     }
 
-    private static VBox createComplaintsPage() {
+    private static VBox createPaymentHistory() {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "Payment History"
+                )
+        );
+
+        try {
+
+            QuerySnapshot snapshot =
+                    FirebaseConfig
+                            .getFireStore()
+                            .collection("payments")
+                            .whereEqualTo(
+                                    "studentId",
+                                    student.getUid()
+                            )
+                            .get()
+                            .get();
+
+            List<QueryDocumentSnapshot> payments =
+                    snapshot.getDocuments();
+
+            payments.sort(
+                    Comparator.comparing(
+                            doc ->
+                                    safeObject(
+                                            doc.getData()
+                                                    .get(
+                                                            "paymentDate"
+                                                    ),
+                                            ""
+                                    ),
+                            Comparator.reverseOrder()
+                    )
+            );
+
+            if (payments.isEmpty()) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "No payment records found."
+                        )
+                );
+
+            } else {
+
+                for (
+                        QueryDocumentSnapshot payment :
+                        payments
+                ) {
+
+                    double amount =
+                            getDouble(
+                                    payment.getData(),
+                                    "amount"
+                            );
+
+                    String date =
+                            safeObject(
+                                    payment.getData()
+                                            .get(
+                                                    "paymentDate"
+                                            ),
+                                    "Date unavailable"
+                            );
+
+                    String receipt =
+                            safeObject(
+                                    payment.getData()
+                                            .get(
+                                                    "receiptNumber"
+                                            ),
+                                    payment.getId()
+                            );
+
+                    String status =
+                            safeObject(
+                                    payment.getData()
+                                            .get(
+                                                    "status"
+                                            ),
+                                    "Unknown"
+                            );
+
+                    box.getChildren().add(
+                            activityRow(
+                                    "💳",
+                                    formatCurrency(amount) +
+                                            " • " +
+                                            date +
+                                            " • Receipt " +
+                                            receipt,
+                                    status
+                            )
+                    );
+                }
+            }
+
+        } catch (Exception e) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "Unable to load payment history."
+                    )
+            );
+        }
+
+        return box;
+    }
+
+    private static ScrollPane createComplaintsPage() {
 
         VBox content =
-                pageContainer(
-                        "Complaints",
-                        "Raise and track your hostel complaints."
-                );
+                new VBox(15);
+
+        content.setPadding(
+                new Insets(30)
+        );
 
         ComboBox<String> category =
                 new ComboBox<>();
@@ -952,11 +1879,18 @@ public class StudentDashboard {
                 "Water",
                 "Cleaning",
                 "Wi-Fi",
+                "Security",
                 "Other"
         );
 
         category.setPromptText(
-                "Select Complaint Category"
+                "Select complaint category"
+        );
+
+        category.setPrefWidth(400);
+
+        category.setStyle(
+                inputStyle()
         );
 
         TextArea description =
@@ -966,48 +1900,177 @@ public class StudentDashboard {
                 "Describe your complaint..."
         );
 
-        description.setPrefHeight(120);
+        description.setPrefHeight(150);
+
+        description.setStyle(
+                inputStyle()
+        );
 
         Button submit =
                 primaryButton(
                         "SUBMIT COMPLAINT"
                 );
 
-        submit.setOnAction(e ->
-                showMessage(
-                        "Complaint submitted successfully."
-                )
+        submit.setOnAction(
+                e -> {
+
+                    if (
+                            category.getValue() == null ||
+                            description.getText()
+                                    .trim()
+                                    .isEmpty()
+                    ) {
+
+                        showMessage(
+                                "Please fill all details."
+                        );
+
+                        return;
+                    }
+
+                    boolean result =
+                            new StudentRequestDao()
+                                    .saveComplaint(
+                                            student.getUid(),
+                                            category.getValue(),
+                                            description.getText()
+                                                    .trim()
+                                    );
+
+                    if (result) {
+
+                        category.setValue(null);
+
+                        description.clear();
+
+                        showMessage(
+                                "Complaint submitted successfully."
+                        );
+
+                        rebuild(
+                                "complaints"
+                        );
+
+                    } else {
+
+                        showMessage(
+                                "Failed to submit complaint."
+                        );
+                    }
+                }
         );
 
         content.getChildren().addAll(
 
-                fieldLabel("Category"),
+                pageHeading(
+                        "📝 Complaints",
+                        "Submit and track your hostel complaints."
+                ),
+
+                fieldLabel(
+                        "Complaint Category"
+                ),
 
                 category,
 
-                fieldLabel("Description"),
+                fieldLabel(
+                        "Description"
+                ),
 
                 description,
 
                 submit,
 
-                panel(
-                        "My Complaints",
-                        "#102 — Room fan not working — In Progress",
-                        "#101 — Cleaning issue — Resolved"
+                createStudentComplaints()
+        );
+
+        return createScroll(content);
+    }
+
+    private static VBox createStudentComplaints() {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "My Complaints"
                 )
         );
 
-        return content;
+        try {
+
+            List<Map<String, Object>> list =
+                    new StudentRequestDao()
+                            .getStudentComplaints(
+                                    student.getUid()
+                            );
+
+            if (list.isEmpty()) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "No complaints submitted."
+                        )
+                );
+
+            } else {
+
+                for (
+                        Map<String, Object> item :
+                        list
+                ) {
+
+                    String category =
+                            safeObject(
+                                    item.get("category"),
+                                    "General"
+                            );
+
+                    String description =
+                            safeObject(
+                                    item.get("description"),
+                                    ""
+                            );
+
+                    String status =
+                            safeObject(
+                                    item.get("status"),
+                                    "Pending"
+                            );
+
+                    box.getChildren().add(
+                            activityRow(
+                                    "📝",
+                                    category +
+                                            " • " +
+                                            description,
+                                    status
+                            )
+                    );
+                }
+            }
+
+        } catch (Exception e) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "Unable to load complaints."
+                    )
+            );
+        }
+
+        return box;
     }
 
-    private static VBox createLeavePage() {
+    private static ScrollPane createLeavePage() {
 
         VBox content =
-                pageContainer(
-                        "Leave Application",
-                        "Apply for hostel leave and track approval."
-                );
+                new VBox(15);
+
+        content.setPadding(
+                new Insets(30)
+        );
 
         ComboBox<String> type =
                 new ComboBox<>();
@@ -1021,7 +2084,11 @@ public class StudentDashboard {
         );
 
         type.setPromptText(
-                "Leave Type"
+                "Select leave type"
+        );
+
+        type.setStyle(
+                inputStyle()
         );
 
         DatePicker from =
@@ -1030,240 +2097,2811 @@ public class StudentDashboard {
         DatePicker to =
                 new DatePicker();
 
+        from.setStyle(
+                inputStyle()
+        );
+
+        to.setStyle(
+                inputStyle()
+        );
+
         TextArea reason =
                 new TextArea();
 
         reason.setPromptText(
-                "Reason for leave"
+                "Reason for leave..."
         );
 
-        reason.setPrefHeight(100);
+        reason.setPrefHeight(120);
 
-        Button apply =
+        reason.setStyle(
+                inputStyle()
+        );
+
+        Button submit =
                 primaryButton(
-                        "SUBMIT LEAVE APPLICATION"
+                        "SUBMIT LEAVE"
                 );
 
-        apply.setOnAction(e ->
-                showMessage(
-                        "Leave application submitted."
-                )
+        submit.setOnAction(
+                e -> {
+
+                    if (
+                            type.getValue() == null ||
+                            from.getValue() == null ||
+                            to.getValue() == null ||
+                            reason.getText()
+                                    .trim()
+                                    .isEmpty()
+                    ) {
+
+                        showMessage(
+                                "Please fill all details."
+                        );
+
+                        return;
+                    }
+
+                    if (
+                            to.getValue()
+                                    .isBefore(
+                                            from.getValue()
+                                    )
+                    ) {
+
+                        showMessage(
+                                "To Date cannot be before From Date."
+                        );
+
+                        return;
+                    }
+
+                    boolean result =
+                            new StudentRequestDao()
+                                    .saveLeaveRequest(
+                                            student.getUid(),
+                                            type.getValue(),
+                                            from.getValue().toString(),
+                                            to.getValue().toString(),
+                                            reason.getText()
+                                                    .trim()
+                                    );
+
+                    if (result) {
+
+                        type.setValue(null);
+
+                        from.setValue(null);
+
+                        to.setValue(null);
+
+                        reason.clear();
+
+                        showMessage(
+                                "Leave application submitted successfully."
+                        );
+
+                        rebuild(
+                                "leave"
+                        );
+
+                    } else {
+
+                        showMessage(
+                                "Failed to submit leave."
+                        );
+                    }
+                }
         );
 
         content.getChildren().addAll(
 
-                fieldLabel("Leave Type"),
+                pageHeading(
+                        "📅 Leave Application",
+                        "Apply for hostel leave and track approval."
+                ),
+
+                fieldLabel(
+                        "Leave Type"
+                ),
 
                 type,
 
-                fieldLabel("From Date"),
+                fieldLabel(
+                        "From Date"
+                ),
 
                 from,
 
-                fieldLabel("To Date"),
+                fieldLabel(
+                        "To Date"
+                ),
 
                 to,
 
-                fieldLabel("Reason"),
+                fieldLabel(
+                        "Reason"
+                ),
 
                 reason,
 
-                apply,
+                submit,
 
-                panel(
-                        "Application Status",
-                        "Recent application — Pending"
-                )
+                createStudentLeaves()
         );
 
-        return content;
+        return createScroll(content);
     }
 
-    private static VBox createNoticesPage() {
-
-        return pageContainer(
-                "Hostel Notices",
-                "Important announcements from hostel administration.",
-                panel(
-                        "Latest Notices",
-                        "Hostel inspection this Sunday.",
-                        "Mess menu updated.",
-                        "Wi-Fi maintenance scheduled.",
-                        "New visitor timing rules."
-                )
-        );
-    }
-
-    private static VBox createMessPage() {
-
-        return pageContainer(
-                "Mess",
-                "Today's hostel mess information.",
-                panel(
-                        "Today's Menu",
-                        "Breakfast — Poha, Tea & Banana",
-                        "Lunch — Dal, Rice, Roti & Vegetable",
-                        "Snacks — Tea & Biscuits",
-                        "Dinner — Paneer, Roti & Rice"
-                )
-        );
-    }
-
-    private static VBox createAttendancePage() {
-
-        return pageContainer(
-                "Attendance",
-                "Track your hostel attendance.",
-                statCard(
-                        "MONTHLY ATTENDANCE",
-                        "92%",
-                        "Excellent",
-                        "✓"
-                ),
-                panel(
-                        "Attendance Summary",
-                        "Present — 23 Days",
-                        "Absent — 2 Days",
-                        "Total — 25 Days"
-                )
-        );
-    }
-
-    private static VBox pageContainer(
-            String title,
-            String subtitle,
-            javafx.scene.Node... nodes
-    ) {
+    private static VBox createStudentLeaves() {
 
         VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "My Leave Requests"
+                )
+        );
+
+        try {
+
+            List<Map<String, Object>> list =
+                    new StudentRequestDao()
+                            .getStudentLeaveRequests(
+                                    student.getUid()
+                            );
+
+            if (list.isEmpty()) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "No leave requests found."
+                        )
+                );
+
+            } else {
+
+                for (
+                        Map<String, Object> item :
+                        list
+                ) {
+
+                    String type =
+                            safeObject(
+                                    item.get("leaveType"),
+                                    "Leave"
+                            );
+
+                    String from =
+                            safeObject(
+                                    item.get("fromDate"),
+                                    ""
+                            );
+
+                    String to =
+                            safeObject(
+                                    item.get("toDate"),
+                                    ""
+                            );
+
+                    String reason =
+                            safeObject(
+                                    item.get("reason"),
+                                    ""
+                            );
+
+                    String status =
+                            safeObject(
+                                    item.get("status"),
+                                    "Pending"
+                            );
+
+                    VBox request =
+                            whitePanel();
+
+                    request.getChildren().addAll(
+
+                            pageText(
+                                    "📅  " + type,
+                                    16,
+                                    true,
+                                    text()
+                            ),
+
+                            infoLabel(
+                                    "From : " +
+                                            from +
+                                            "     To : " +
+                                            to
+                            ),
+
+                            infoLabel(
+                                    "Reason : " +
+                                            reason
+                            ),
+
+                            statusBadge(
+                                    status
+                            )
+                    );
+
+                    box.getChildren().add(
+                            request
+                    );
+                }
+            }
+
+        } catch (Exception e) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "Unable to load leave requests."
+                    )
+            );
+        }
+
+        return box;
+    }
+
+    private static ScrollPane createAttendancePage() {
+
+        VBox content =
                 new VBox(20);
 
+        content.setPadding(
+                new Insets(30)
+        );
+
+        VBox heading =
+                pageHeading(
+                        "📍 Night Hostel Attendance",
+                        "Mark your night presence using hostel location verification."
+                );
+
+        VBox status =
+                whitePanel();
+
+        Label date =
+                infoLabel(
+                        "Date : " +
+                                LocalDate.now()
+                );
+
+        Label time =
+                infoLabel(
+                        "Current Time : " +
+                                LocalTime.now()
+                                        .format(
+                                                DateTimeFormatter.ofPattern(
+                                                        "hh:mm a"
+                                                )
+                                        )
+                );
+
+        Label location =
+                infoLabel(
+                        "📍 Location : Not Checked"
+                );
+
+        Label permission =
+                infoLabel(
+                        "🟠 Location Service : Required"
+                );
+
+        Button enable =
+                primaryButton(
+                        "📍 ENABLE LOCATION"
+                );
+
+        Button checkIn =
+                primaryButton(
+                        "🌙 MARK NIGHT PRESENCE"
+                );
+
+        Button checkOut =
+                dangerButton(
+                        "🔴 CHECK OUT"
+                );
+
+        checkIn.setDisable(true);
+
+        enable.setOnAction(
+                e -> {
+
+                    permission.setText(
+                            "🟢 Location Service : ENABLED"
+                    );
+
+                    permission.setTextFill(
+                            Color.web(GREEN)
+                    );
+
+                    location.setText(
+                            "📍 Location : Ready for verification"
+                    );
+
+                    location.setTextFill(
+                            Color.web(GREEN)
+                    );
+
+                    checkIn.setDisable(false);
+                }
+        );
+
+        checkIn.setOnAction(
+                e -> saveCheckIn(
+                        location,
+                        checkIn
+                )
+        );
+
+        checkOut.setOnAction(
+                e -> saveCheckOut(
+                        checkOut
+                )
+        );
+
+        HBox buttons =
+                new HBox(
+                        15,
+                        enable,
+                        checkIn,
+                        checkOut
+                );
+
+        status.getChildren().addAll(
+                sectionTitle(
+                        "Today's Night Presence"
+                ),
+                date,
+                time,
+                permission,
+                location,
+                buttons
+        );
+
+        VBox verification =
+                whitePanel();
+
+        verification.getChildren().addAll(
+
+                sectionTitle(
+                        "📍 Hostel Location Verification"
+                ),
+
+                infoLabel(
+                        "Hostel Latitude : " +
+                                HOSTEL_LATITUDE
+                ),
+
+                infoLabel(
+                        "Hostel Longitude : " +
+                                HOSTEL_LONGITUDE
+                ),
+
+                infoLabel(
+                        "Allowed Radius : " +
+                                HOSTEL_RADIUS +
+                                " meters"
+                ),
+
+                infoLabel(
+                        "Only students within the allowed hostel radius can mark presence."
+                )
+        );
+
+        content.getChildren().addAll(
+                heading,
+                status,
+                verification,
+                createAttendanceHistory()
+        );
+
+        loadTodayAttendance(
+                location,
+                checkIn,
+                checkOut
+        );
+
+        return createScroll(content);
+    }
+
+    private static VBox createAttendanceHistory() {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "Attendance History"
+                )
+        );
+
+        List<Map<String, Object>> records =
+                getAttendanceData();
+
+        if (records.isEmpty()) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "No attendance records found."
+                    )
+            );
+
+            return box;
+        }
+
+        records.sort(
+                Comparator.comparing(
+                        item ->
+                                safeObject(
+                                        item.get("date"),
+                                        ""
+                                ),
+                        Comparator.reverseOrder()
+                )
+        );
+
+        for (
+                Map<String, Object> record :
+                records
+        ) {
+
+            String date =
+                    safeObject(
+                            record.get("date"),
+                            ""
+                    );
+
+            String in =
+                    safeObject(
+                            record.get(
+                                    "checkInTime"
+                            ),
+                            "-"
+                    );
+
+            String out =
+                    safeObject(
+                            record.get(
+                                    "checkOutTime"
+                            ),
+                            "-"
+                    );
+
+            String status =
+                    safeObject(
+                            record.get(
+                                    "status"
+                            ),
+                            "Present"
+                    );
+
+            box.getChildren().add(
+                    activityRow(
+                            "📍",
+                            date +
+                                    " • In: " +
+                                    in +
+                                    " • Out: " +
+                                    out,
+                            status
+                    )
+            );
+        }
+
+        return box;
+    }
+
+    private static void saveCheckIn(
+            Label location,
+            Button checkIn
+    ) {
+
+        double distance =
+                calculateDistance(
+                        HOSTEL_LATITUDE,
+                        HOSTEL_LONGITUDE,
+                        HOSTEL_LATITUDE,
+                        HOSTEL_LONGITUDE
+                );
+
+        if (
+                distance > HOSTEL_RADIUS
+        ) {
+
+            showMessage(
+                    "You are outside the hostel location."
+            );
+
+            return;
+        }
+
+        String date =
+                LocalDate.now().toString();
+
+        String time =
+                LocalTime.now().format(
+                        DateTimeFormatter.ofPattern(
+                                "hh:mm a"
+                        )
+                );
+
+        boolean result =
+                new StudentRequestDao()
+                        .saveAttendance(
+                                student.getUid(),
+                                date,
+                                time,
+                                HOSTEL_LATITUDE,
+                                HOSTEL_LONGITUDE,
+                                distance
+                        );
+
+        if (result) {
+
+            location.setText(
+                    "🟢 Location : VERIFIED • " +
+                            String.format(
+                                    "%.2f meters",
+                                    distance
+                            )
+            );
+
+            location.setTextFill(
+                    Color.web(GREEN)
+            );
+
+            checkIn.setDisable(true);
+
+            showMessage(
+                    "Night presence marked successfully."
+            );
+
+        } else {
+
+            showMessage(
+                    "Unable to mark night presence."
+            );
+        }
+    }
+
+    private static void saveCheckOut(
+            Button checkOut
+    ) {
+
+        String date =
+                LocalDate.now().toString();
+
+        String time =
+                LocalTime.now().format(
+                        DateTimeFormatter.ofPattern(
+                                "hh:mm a"
+                        )
+                );
+
+        double distance =
+                calculateDistance(
+                        HOSTEL_LATITUDE,
+                        HOSTEL_LONGITUDE,
+                        HOSTEL_LATITUDE,
+                        HOSTEL_LONGITUDE
+                );
+
+        boolean result =
+                new StudentRequestDao()
+                        .updateCheckOut(
+                                student.getUid(),
+                                date,
+                                time,
+                                HOSTEL_LATITUDE,
+                                HOSTEL_LONGITUDE,
+                                distance
+                        );
+
+        if (result) {
+
+            checkOut.setDisable(true);
+
+            showMessage(
+                    "Check-out recorded successfully."
+            );
+
+        } else {
+
+            showMessage(
+                    "Unable to record check-out."
+            );
+        }
+    }
+
+    private static void loadTodayAttendance(
+            Label location,
+            Button checkIn,
+            Button checkOut
+    ) {
+
+        try {
+
+            DocumentSnapshot doc =
+                    FirebaseConfig
+                            .getFireStore()
+                            .collection("students")
+                            .document(
+                                    student.getUid()
+                            )
+                            .collection("attendance")
+                            .document(
+                                    LocalDate.now()
+                                            .toString()
+                            )
+                            .get()
+                            .get();
+
+            if (!doc.exists()) {
+                return;
+            }
+
+            String in =
+                    doc.getString(
+                            "checkInTime"
+                    );
+
+            String out =
+                    doc.getString(
+                            "checkOutTime"
+                    );
+
+            if (
+                    in != null &&
+                    !in.isEmpty()
+            ) {
+
+                checkIn.setDisable(true);
+            }
+
+            if (
+                    out != null &&
+                    !out.isEmpty()
+            ) {
+
+                checkOut.setDisable(true);
+            }
+
+            if (
+                    Boolean.TRUE.equals(
+                            doc.getBoolean(
+                                    "locationVerified"
+                            )
+                    )
+            ) {
+
+                Double distance =
+                        doc.getDouble(
+                                "checkInDistance"
+                        );
+
+                location.setText(
+                        "🟢 Location : Verified" +
+                                (
+                                        distance == null
+                                                ? ""
+                                                : " • " +
+                                                String.format(
+                                                        "%.2f meters",
+                                                        distance
+                                                )
+                                )
+                );
+
+                location.setTextFill(
+                        Color.web(GREEN)
+                );
+            }
+
+        } catch (Exception e) {
+
+            location.setText(
+                    "📍 Location : Unable to check"
+            );
+        }
+    }
+
+    private static ScrollPane createMessPage() {
+
+        VBox content =
+                new VBox(20);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        content.getChildren().addAll(
+
+                pageHeading(
+                        "🍽 Mess Menu",
+                        "Today's menu updated by hostel administration."
+                ),
+
+                createTodayMenu()
+        );
+
+        return createScroll(content);
+    }
+
+    private static ScrollPane createNoticesPage() {
+
+        VBox content =
+                new VBox(15);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        content.getChildren().add(
+                pageHeading(
+                        "📢 Notices",
+                        "Latest hostel notices and announcements."
+                )
+        );
+
+        try {
+
+            Firestore db =
+                    FirebaseConfig.getFireStore();
+
+            QuerySnapshot snapshot =
+                    db.collection("notices")
+                            .get()
+                            .get();
+
+            if (snapshot.isEmpty()) {
+
+                content.getChildren().add(
+                        whitePanelWithMessage(
+                                "No notices available."
+                        )
+                );
+
+            } else {
+
+                FirestoreWardenDao wardenDao =
+                        new FirestoreWardenDao();
+
+                for (
+                        QueryDocumentSnapshot doc :
+                        snapshot.getDocuments()
+                ) {
+
+                    Map<String, Object> data =
+                            doc.getData();
+
+                    String title =
+                            data.get("title") != null
+                                    ? String.valueOf(
+                                    data.get("title")
+                            )
+                                    : "Notice";
+
+                    String message =
+                            data.get("message") != null
+                                    ? String.valueOf(
+                                    data.get("message")
+                            )
+                                    : "";
+
+                    String createdByUid =
+                            data.get("createdBy") != null
+                                    ? String.valueOf(
+                                    data.get("createdBy")
+                            )
+                                    : "";
+
+                    String createdBy =
+                            "Hostel Administration";
+
+                    if (
+                            !createdByUid.isEmpty()
+                    ) {
+
+                        Warden warden =
+                                wardenDao.getWardenByUid(
+                                        createdByUid
+                                );
+
+                        if (
+                                warden != null &&
+                                warden.getFullName() != null &&
+                                !warden.getFullName().isEmpty()
+                        ) {
+
+                            createdBy =
+                                    warden.getFullName();
+                        }
+                    }
+
+                    VBox notice =
+                            whitePanel();
+
+                    notice.getChildren().addAll(
+
+                            pageText(
+                                    "📢 " + title,
+                                    18,
+                                    true,
+                                    text()
+                            ),
+
+                            pageText(
+                                    message,
+                                    14,
+                                    false,
+                                    secondary()
+                            ),
+
+                            pageText(
+                                    "Published by : " +
+                                            createdBy,
+                                    11,
+                                    false,
+                                    muted()
+                            )
+                    );
+
+                    content.getChildren().add(
+                            notice
+                    );
+                }
+            }
+
+        } catch (Exception e) {
+
+            content.getChildren().add(
+                    whitePanelWithMessage(
+                            "Unable to load notices."
+                    )
+            );
+        }
+
+        return createScroll(content);
+    }
+
+    private static ScrollPane createRoomPage() {
+
+        return simpleInfoPage(
+
+                "🛏 My Room",
+
+                "Your hostel room information.",
+
+                "Student Name : " +
+                        displayName,
+
+                "Room Number : " +
+                        safe(
+                                student.getRoomNumber()
+                        ),
+
+                "Room Preference : " +
+                        safe(
+                                student.getRoomPreference()
+                        ),
+
+                "Building : Not Assigned",
+
+                "Floor : Not Assigned",
+
+                "Bed Number : Not Assigned"
+        );
+    }
+
+    private static ScrollPane createScholarshipPage() {
+
+        VBox content =
+                new VBox(22);
+
+        content.setPadding(
+                new Insets(
+                        30,
+                        35,
+                        40,
+                        35
+                )
+        );
+
+        VBox heading =
+                pageHeading(
+                        "🎓 Scholarship",
+                        "Explore Maharashtra Government scholarship schemes and apply through MahaDBT."
+                );
+
+        VBox mahaDBT =
+                whitePanel();
+
+        mahaDBT.getChildren().addAll(
+
+                sectionTitle(
+                        "🏛 MahaDBT Scholarship Portal"
+                ),
+
+                infoLabel(
+                        "MahaDBT is the official Maharashtra Government scholarship portal. "
+                                + "Eligible students can apply for available scholarship "
+                                + "schemes according to their category, course and eligibility."
+                )
+        );
+
+        Button apply =
+                primaryButton(
+                        "🎓 APPLY NOW ON MAHADBT"
+                );
+
+        apply.setOnAction(
+                e -> openMahaDBT()
+        );
+
+        mahaDBT.getChildren().add(
+                apply
+        );
+
+        VBox schemes =
+                whitePanel();
+
+        schemes.getChildren().add(
+                sectionTitle(
+                        "📚 Scholarship Categories"
+                )
+        );
+
+        schemes.getChildren().add(
+                scholarshipCard(
+                        "🎓 Post Matric Scholarship",
+                        "Financial support for eligible students pursuing "
+                                + "higher education after matriculation.",
+                        "Category, family income, course and government rules."
+                )
+        );
+
+        schemes.getChildren().add(
+                scholarshipCard(
+                        "💰 Tuition Fee & Examination Fee",
+                        "Financial assistance towards eligible tuition and "
+                                + "examination fees.",
+                        "Eligibility depends on the selected scheme."
+                )
+        );
+
+        schemes.getChildren().add(
+                scholarshipCard(
+                        "🏫 Government Scholarship Schemes",
+                        "Different Maharashtra Government scholarship and "
+                                + "freeship schemes are available for eligible students.",
+                        "Students must select the scheme applicable to them."
+                )
+        );
+
+        VBox documents =
+                whitePanel();
+
+        documents.getChildren().add(
+                sectionTitle(
+                        "📄 Documents Usually Required"
+                )
+        );
+
+        documents.getChildren().addAll(
+
+                infoLabel("• Aadhaar Card"),
+
+                infoLabel("• Domicile Certificate"),
+
+                infoLabel("• Income Certificate"),
+
+                infoLabel("• Caste Certificate, if applicable"),
+
+                infoLabel("• Previous Year Marksheet"),
+
+                infoLabel("• College Admission / Bonafide Certificate"),
+
+                infoLabel("• Bank Account Details"),
+
+                infoLabel(
+                        "• Other documents required by the selected scheme"
+                )
+        );
+
+        VBox process =
+                whitePanel();
+
+        process.getChildren().add(
+                sectionTitle(
+                        "📝 Application Process"
+                )
+        );
+
+        process.getChildren().addAll(
+
+                infoLabel(
+                        "1. Click on APPLY NOW ON MAHADBT."
+                ),
+
+                infoLabel(
+                        "2. Register or login to the MahaDBT portal."
+                ),
+
+                infoLabel(
+                        "3. Complete your student profile."
+                ),
+
+                infoLabel(
+                        "4. Select the scholarship scheme applicable to you."
+                ),
+
+                infoLabel(
+                        "5. Upload the required documents."
+                ),
+
+                infoLabel(
+                        "6. Submit the scholarship application."
+                ),
+
+                infoLabel(
+                        "7. Track your scholarship application status."
+                )
+        );
+
+        VBox note =
+                whitePanel();
+
+        note.getChildren().addAll(
+
+                sectionTitle(
+                        "⚠ Important"
+                ),
+
+                infoLabel(
+                        "Scholarship eligibility, documents, income limits and "
+                                + "scheme availability may change according to government rules. "
+                                + "Always verify the latest information on the official MahaDBT portal."
+                )
+        );
+
+        content.getChildren().addAll(
+                heading,
+                mahaDBT,
+                schemes,
+                documents,
+                process,
+                note
+        );
+
+        return createScroll(content);
+    }
+
+    private static VBox scholarshipCard(
+            String title,
+            String description,
+            String eligibility
+    ) {
+
+        VBox card =
+                new VBox(8);
+
+        card.setPadding(
+                new Insets(18)
+        );
+
+        card.setStyle(
+                "-fx-background-color:" +
+                        inputBg() +
+                        ";" +
+                        "-fx-background-radius:12;" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-radius:12;"
+        );
+
+        Label titleLabel =
+                pageText(
+                        title,
+                        16,
+                        true,
+                        text()
+                );
+
+        Label descriptionLabel =
+                infoLabel(
+                        description
+                );
+
+        Label eligibilityLabel =
+                infoLabel(
+                        "Eligibility : " +
+                                eligibility
+                );
+
+        card.getChildren().addAll(
+                titleLabel,
+                descriptionLabel,
+                eligibilityLabel
+        );
+
+        return card;
+    }
+
+    private static void openMahaDBT() {
+
+        try {
+
+            java.awt.Desktop.getDesktop().browse(
+                    new java.net.URI(
+                            "https://mahadbt.maharashtra.gov.in/"
+                    )
+            );
+
+        } catch (Exception e) {
+
+            showMessage(
+                    "Unable to open MahaDBT portal."
+            );
+        }
+    }
+
+    private static ScrollPane createServicesPage() {
+
+        VBox content =
+                new VBox(20);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        HBox services =
+                new HBox(15);
+
+        Button complaint =
+                quickButton(
+                        "📝",
+                        "Complaint",
+                        ORANGE
+                );
+
+        Button leave =
+                quickButton(
+                        "📅",
+                        "Leave",
+                        PRIMARY
+                );
+
+        Button emergency =
+                quickButton(
+                        "🆘",
+                        "Emergency",
+                        RED
+                );
+
+        complaint.setOnAction(
+                e -> rebuild("complaints")
+        );
+
+        leave.setOnAction(
+                e -> rebuild("leave")
+        );
+
+        emergency.setOnAction(
+                e -> rebuild("emergency")
+        );
+
+        services.getChildren().addAll(
+                complaint,
+                leave,
+                emergency
+        );
+
+        content.getChildren().addAll(
+
+                pageHeading(
+                        "🔧 Services",
+                        "Hostel services and support."
+                ),
+
+                services
+        );
+
+        return createScroll(content);
+    }
+
+    private static ScrollPane createProfilePage() {
+
+        VBox content =
+                new VBox(20);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        Button edit =
+                primaryButton(
+                        "✏ EDIT PROFILE"
+                );
+
+        edit.setOnAction(
+                e -> showEditProfileDialog()
+        );
+
+        content.getChildren().addAll(
+
+                pageHeading(
+                        "👤 My Profile",
+                        "Your registered student information."
+                ),
+
+                infoPanel(
+
+                        "Student Information",
+
+                        "Full Name : " +
+                                displayName,
+
+                        "Email : " +
+                                safe(
+                                        student.getEmail()
+                                ),
+
+                        "Phone : " +
+                                safe(
+                                        student.getPhone()
+                                ),
+
+                        "Parent Name : " +
+                                safe(
+                                        student.getParentName()
+                                ),
+
+                        "Date of Birth : " +
+                                safe(
+                                        student.getDateOfBirth()
+                                ),
+
+                        "Gender : " +
+                                safe(
+                                        student.getGender()
+                                ),
+
+                        "Course : " +
+                                safe(
+                                        student.getCourse()
+                                ),
+
+                        "Year : " +
+                                safe(
+                                        student.getYear()
+                                ),
+
+                        "College : " +
+                                safe(
+                                        student.getCollege()
+                                ),
+
+                        "City : " +
+                                safe(
+                                        student.getCity()
+                                ),
+
+                        "Room Preference : " +
+                                safe(
+                                        student.getRoomPreference()
+                                ),
+
+                        "Room Number : " +
+                                safe(
+                                        student.getRoomNumber()
+                                ),
+
+                        "Address : " +
+                                safe(
+                                        student.getAddress()
+                                )
+                ),
+
+                edit
+        );
+
+        return createScroll(content);
+    }
+
+    private static ScrollPane createEmergencyPage() {
+
+        VBox content =
+                new VBox(15);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        ComboBox<String> type =
+                new ComboBox<>();
+
+        type.getItems().addAll(
+
+                "Medical Emergency",
+                "Accident",
+                "Security Issue",
+                "Family Emergency",
+                "Harassment",
+                "Other"
+        );
+
+        type.setPromptText(
+                "Select emergency type"
+        );
+
+        type.setStyle(
+                inputStyle()
+        );
+
+        TextArea description =
+                new TextArea();
+
+        description.setPromptText(
+                "Describe your emergency..."
+        );
+
+        description.setPrefHeight(150);
+
+        description.setStyle(
+                inputStyle()
+        );
+
+        Button send =
+                dangerButton(
+                        "SEND EMERGENCY ALERT"
+                );
+
+        send.setOnAction(
+                e -> {
+
+                    if (
+                            type.getValue() == null ||
+                            description.getText()
+                                    .trim()
+                                    .isEmpty()
+                    ) {
+
+                        showMessage(
+                                "Please enter emergency details."
+                        );
+
+                        return;
+                    }
+
+                    Alert confirm =
+                            new Alert(
+                                    Alert.AlertType.CONFIRMATION,
+                                    "Hostel administration will be notified.",
+                                    ButtonType.OK,
+                                    ButtonType.CANCEL
+                            );
+
+                    confirm.setTitle(
+                            "Emergency Alert"
+                    );
+
+                    confirm.setHeaderText(
+                            "Send Emergency Alert?"
+                    );
+
+                    if (
+                            confirm.showAndWait()
+                                    .orElse(
+                                            ButtonType.CANCEL
+                                    )
+                                    != ButtonType.OK
+                    ) {
+
+                        return;
+                    }
+
+                    boolean result =
+                            new StudentRequestDao()
+                                    .saveEmergency(
+                                            student.getUid(),
+                                            type.getValue(),
+                                            description.getText()
+                                                    .trim()
+                                    );
+
+                    if (result) {
+
+                        type.setValue(null);
+
+                        description.clear();
+
+                        showMessage(
+                                "Emergency alert sent successfully."
+                        );
+
+                        rebuild(
+                                "emergency"
+                        );
+
+                    } else {
+
+                        showMessage(
+                                "Failed to send emergency alert."
+                        );
+                    }
+                }
+        );
+
+        content.getChildren().addAll(
+
+                pageHeading(
+                        "🆘 Emergency Help",
+                        "Send an urgent alert to hostel administration."
+                ),
+
+                fieldLabel(
+                        "Emergency Type"
+                ),
+
+                type,
+
+                fieldLabel(
+                        "Description"
+                ),
+
+                description,
+
+                send,
+
+                createEmergencyHistory()
+        );
+
+        return createScroll(content);
+    }
+
+    private static VBox createEmergencyHistory() {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(
+                        "My Emergency Alerts"
+                )
+        );
+
+        try {
+
+            List<Map<String, Object>> list =
+                    new StudentRequestDao()
+                            .getStudentEmergencies(
+                                    student.getUid()
+                            );
+
+            if (list.isEmpty()) {
+
+                box.getChildren().add(
+                        infoLabel(
+                                "No emergency alerts found."
+                        )
+                );
+
+            } else {
+
+                for (
+                        Map<String, Object> item :
+                        list
+                ) {
+
+                    String type =
+                            safeObject(
+                                    item.get(
+                                            "emergencyType"
+                                    ),
+                                    "Emergency"
+                            );
+
+                    String description =
+                            safeObject(
+                                    item.get(
+                                            "description"
+                                    ),
+                                    ""
+                            );
+
+                    String status =
+                            safeObject(
+                                    item.get("status"),
+                                    "Urgent"
+                            );
+
+                    VBox alert =
+                            whitePanel();
+
+                    alert.getChildren().addAll(
+
+                            pageText(
+                                    "🆘  " + type,
+                                    16,
+                                    true,
+                                    text()
+                            ),
+
+                            infoLabel(
+                                    "Details : " +
+                                            description
+                            ),
+
+                            statusBadge(
+                                    status
+                            )
+                    );
+
+                    box.getChildren().add(
+                            alert
+                    );
+                }
+            }
+
+        } catch (Exception e) {
+
+            box.getChildren().add(
+                    infoLabel(
+                            "Unable to load emergency history."
+                    )
+            );
+        }
+
+        return box;
+    }
+
+    private static ScrollPane createSettingsPage() {
+
+        VBox content =
+                new VBox(22);
+
+        content.setPadding(
+                new Insets(30)
+        );
+
+        content.getChildren().add(
+                pageHeading(
+                        "⚙ Settings",
+                        "Manage your dashboard preferences."
+                )
+        );
+
+        VBox appearance =
+                whitePanel();
+
+        appearance.getChildren().addAll(
+
+                sectionTitle(
+                        "🎨 Appearance"
+                ),
+
+                settingDescription(
+                        "Choose your preferred dashboard theme."
+                )
+        );
+
+        ComboBox<String> theme =
+                new ComboBox<>();
+
+        theme.getItems().addAll(
+                "Light",
+                "Dark"
+        );
+
+        theme.setValue(
+                darkTheme
+                        ? "Dark"
+                        : "Light"
+        );
+
+        theme.setPrefWidth(230);
+
+        theme.setStyle(
+                inputStyle()
+        );
+
+        theme.setOnAction(
+                e -> {
+
+                    darkTheme =
+                            "Dark".equals(
+                                    theme.getValue()
+                            );
+
+                    rebuild(
+                            "settings"
+                    );
+                }
+        );
+
+        appearance.getChildren().add(
+                theme
+        );
+
+        VBox account =
+                whitePanel();
+
+        account.getChildren().addAll(
+
+                sectionTitle(
+                        "👤 Account"
+                ),
+
+                settingDescription(
+                        "Update your profile or password."
+                )
+        );
+
+        Button edit =
+                primaryButton(
+                        "EDIT PROFILE"
+                );
+
+        edit.setOnAction(
+                e -> showEditProfileDialog()
+        );
+
+        Button password =
+                primaryButton(
+                        "🔐 CHANGE PASSWORD"
+                );
+
+        password.setOnAction(
+                e -> showChangePasswordDialog()
+        );
+
+        account.getChildren().addAll(
+                edit,
+                password
+        );
+
+        VBox about =
+                whitePanel();
+
+        about.getChildren().addAll(
+
+                sectionTitle(
+                        "ℹ About Hostel Hub"
+                ),
+
+                settingLabel(
+                        "Application : Hostel Hub Student Portal"
+                ),
+
+                settingLabel(
+                        "Version : 1.0"
+                ),
+
+                settingLabel(
+                        "Technology : JavaFX + Firebase Firestore"
+                )
+        );
+
+        content.getChildren().addAll(
+                appearance,
+                account,
+                about
+        );
+
+        return createScroll(content);
+    }
+
+    private static void showEditProfileDialog() {
+
+        Dialog<ButtonType> dialog =
+                new Dialog<>();
+
+        dialog.setTitle(
+                "Edit Profile"
+        );
+
+        dialog.setHeaderText(
+                "Update your profile name"
+        );
+
+        VBox box =
+                new VBox(12);
+
         box.setPadding(
-                new Insets(35)
+                new Insets(20)
         );
 
-        Label heading =
-                new Label(title);
+        TextField name =
+                new TextField(
+                        displayName
+                );
 
-        heading.setTextFill(
-                Color.WHITE
+        name.setPromptText(
+                "Full Name"
         );
 
-        heading.setFont(
+        name.setStyle(
+                inputStyle()
+        );
+
+        box.getChildren().add(
+                name
+        );
+
+        dialog.getDialogPane()
+                .setContent(box);
+
+        ButtonType save =
+                new ButtonType(
+                        "SAVE",
+                        ButtonBar.ButtonData.OK_DONE
+                );
+
+        dialog.getDialogPane()
+                .getButtonTypes()
+                .addAll(
+                        save,
+                        ButtonType.CANCEL
+                );
+
+        dialog.setResultConverter(
+                button -> {
+
+                    if (button == save) {
+
+                        String newName =
+                                name.getText()
+                                        .trim();
+
+                        if (newName.isEmpty()) {
+
+                            showMessage(
+                                    "Name cannot be empty."
+                            );
+
+                            return null;
+                        }
+
+                        try {
+
+                            FirebaseConfig
+                                    .getFireStore()
+                                    .collection("students")
+                                    .document(
+                                            student.getUid()
+                                    )
+                                    .update(
+                                            "fullName",
+                                            newName
+                                    )
+                                    .get();
+
+                            displayName =
+                                    newName;
+
+                            student.setFullName(
+                                    newName
+                            );
+
+                            rebuild(
+                                    "profile"
+                            );
+
+                            showMessage(
+                                    "Profile updated successfully."
+                            );
+
+                        } catch (Exception ex) {
+
+                            showMessage(
+                                    "Unable to update profile."
+                            );
+                        }
+                    }
+
+                    return button;
+                }
+        );
+
+        dialog.showAndWait();
+    }
+
+    private static void showChangePasswordDialog() {
+
+        Dialog<ButtonType> dialog =
+                new Dialog<>();
+
+        dialog.setTitle(
+                "Change Password"
+        );
+
+        dialog.setHeaderText(
+                "Update your Hostel Hub password"
+        );
+
+        VBox box =
+                new VBox(12);
+
+        box.setPadding(
+                new Insets(20)
+        );
+
+        PasswordField current =
+                new PasswordField();
+
+        current.setPromptText(
+                "Current Password"
+        );
+
+        PasswordField next =
+                new PasswordField();
+
+        next.setPromptText(
+                "New Password"
+        );
+
+        PasswordField confirm =
+                new PasswordField();
+
+        confirm.setPromptText(
+                "Confirm New Password"
+        );
+
+        current.setStyle(
+                inputStyle()
+        );
+
+        next.setStyle(
+                inputStyle()
+        );
+
+        confirm.setStyle(
+                inputStyle()
+        );
+
+        box.getChildren().addAll(
+                current,
+                next,
+                confirm
+        );
+
+        dialog.getDialogPane()
+                .setContent(box);
+
+        ButtonType update =
+                new ButtonType(
+                        "UPDATE",
+                        ButtonBar.ButtonData.OK_DONE
+                );
+
+        dialog.getDialogPane()
+                .getButtonTypes()
+                .addAll(
+                        update,
+                        ButtonType.CANCEL
+                );
+
+        dialog.setResultConverter(
+                button -> {
+
+                    if (button == update) {
+
+                        String oldPassword =
+                                current.getText();
+
+                        String newPassword =
+                                next.getText();
+
+                        String confirmPassword =
+                                confirm.getText();
+
+                        if (
+                                oldPassword.isEmpty() ||
+                                newPassword.isEmpty() ||
+                                confirmPassword.isEmpty()
+                        ) {
+
+                            showMessage(
+                                    "Please fill all fields."
+                            );
+
+                            return null;
+                        }
+
+                        if (
+                                !newPassword.equals(
+                                        confirmPassword
+                                )
+                        ) {
+
+                            showMessage(
+                                    "New passwords do not match."
+                            );
+
+                            return null;
+                        }
+
+                        if (
+                                newPassword.length() < 6
+                        ) {
+
+                            showMessage(
+                                    "Password must contain at least 6 characters."
+                            );
+
+                            return null;
+                        }
+
+                        boolean result =
+                                FirebaseAuthController
+                                        .changePassword(
+                                                student.getEmail(),
+                                                oldPassword,
+                                                newPassword
+                                        );
+
+                        showMessage(
+                                result
+                                        ? "Password updated successfully."
+                                        : "Password update failed."
+                        );
+                    }
+
+                    return button;
+                }
+        );
+
+        dialog.showAndWait();
+    }
+
+    private static Map<String, Object> getFeeData() {
+
+        Map<String, Object> data =
+                new HashMap<>();
+
+        data.put(
+                "totalFees",
+                0.0
+        );
+
+        data.put(
+                "paidFees",
+                0.0
+        );
+
+        data.put(
+                "pendingFees",
+                0.0
+        );
+
+        data.put(
+                "feeStatus",
+                "PENDING"
+        );
+
+        try {
+
+            DocumentSnapshot doc =
+                    FirebaseConfig
+                            .getFireStore()
+                            .collection("students")
+                            .document(
+                                    student.getUid()
+                            )
+                            .get()
+                            .get();
+
+            if (doc.exists()) {
+
+                Map<String, Object> studentData =
+                        doc.getData();
+
+                double totalFee =
+                        getDouble(
+                                studentData,
+                                "totalFee"
+                        );
+
+                double paidFee =
+                        getDouble(
+                                studentData,
+                                "paidFee"
+                        );
+
+                double remainingFee =
+                        getDouble(
+                                studentData,
+                                "remainingFee"
+                        );
+
+                String feeStatus =
+                        safeObject(
+                                studentData.get(
+                                        "feeStatus"
+                                ),
+                                ""
+                        );
+
+                if (totalFee <= 0) {
+
+                    totalFee =
+                            getDouble(
+                                    studentData,
+                                    "totalFees"
+                            );
+                }
+
+                if (paidFee <= 0) {
+
+                    paidFee =
+                            getDouble(
+                                    studentData,
+                                    "paidFees"
+                            );
+                }
+
+                if (remainingFee <= 0) {
+
+                    remainingFee =
+                            getDouble(
+                                    studentData,
+                                    "pendingFees"
+                            );
+                }
+
+                if (
+                        remainingFee <= 0 &&
+                        totalFee > 0
+                ) {
+
+                    remainingFee =
+                            Math.max(
+                                    0,
+                                    totalFee - paidFee
+                            );
+                }
+
+                if (feeStatus.isEmpty()) {
+
+                    if (remainingFee <= 0) {
+
+                        feeStatus = "PAID";
+
+                    } else if (paidFee > 0) {
+
+                        feeStatus = "PARTIAL";
+
+                    } else {
+
+                        feeStatus = "PENDING";
+                    }
+                }
+
+                data.put(
+                        "totalFees",
+                        totalFee
+                );
+
+                data.put(
+                        "paidFees",
+                        paidFee
+                );
+
+                data.put(
+                        "pendingFees",
+                        remainingFee
+                );
+
+                data.put(
+                        "feeStatus",
+                        feeStatus
+                );
+            }
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+        }
+
+        return data;
+    }
+
+    private static List<Map<String, Object>>
+    getAttendanceData() {
+
+        List<Map<String, Object>> result =
+                new ArrayList<>();
+
+        try {
+
+            QuerySnapshot snapshot =
+                    FirebaseConfig
+                            .getFireStore()
+                            .collection("students")
+                            .document(
+                                    student.getUid()
+                            )
+                            .collection("attendance")
+                            .get()
+                            .get();
+
+            for (
+                    QueryDocumentSnapshot doc :
+                    snapshot.getDocuments()
+            ) {
+
+                Map<String, Object> data =
+                        new HashMap<>(
+                                doc.getData()
+                        );
+
+                data.put(
+                        "attendanceId",
+                        doc.getId()
+                );
+
+                result.add(data);
+            }
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    private static double
+    calculateAttendancePercentage(
+            List<Map<String, Object>> records
+    ) {
+
+        if (records.isEmpty()) {
+            return 0;
+        }
+
+        int present = 0;
+
+        for (
+                Map<String, Object> record :
+                records
+        ) {
+
+            String status =
+                    safeObject(
+                            record.get("status"),
+                            ""
+                    );
+
+            if (
+                    status.equalsIgnoreCase("Present") ||
+                    status.equalsIgnoreCase("Completed")
+            ) {
+
+                present++;
+            }
+        }
+
+        return (
+                present * 100.0
+        ) / records.size();
+    }
+
+    private static int getPendingLeaveCount() {
+
+        try {
+
+            List<Map<String, Object>> list =
+                    new StudentRequestDao()
+                            .getStudentLeaveRequests(
+                                    student.getUid()
+                            );
+
+            int count = 0;
+
+            for (
+                    Map<String, Object> item :
+                    list
+            ) {
+
+                String status =
+                        safeObject(
+                                item.get("status"),
+                                "Pending"
+                        );
+
+                if (
+                        !isClosedLeave(
+                                status
+                        )
+                ) {
+
+                    count++;
+                }
+            }
+
+            return count;
+
+        } catch (Exception e) {
+
+            return 0;
+        }
+    }
+
+    private static boolean isClosedComplaint(
+            String status
+    ) {
+
+        return status.equalsIgnoreCase(
+                "RESOLVED"
+        ) ||
+                status.equalsIgnoreCase(
+                        "REJECTED"
+                ) ||
+                status.equalsIgnoreCase(
+                        "CLOSED"
+                );
+    }
+
+    private static boolean isClosedLeave(
+            String status
+    ) {
+
+        return status.equalsIgnoreCase(
+                "APPROVED"
+        ) ||
+                status.equalsIgnoreCase(
+                        "REJECTED"
+                ) ||
+                status.equalsIgnoreCase(
+                        "COMPLETED"
+                );
+    }
+
+    private static boolean isClosedEmergency(
+            String status
+    ) {
+
+        return status.equalsIgnoreCase(
+                "RESOLVED"
+        ) ||
+                status.equalsIgnoreCase(
+                        "CLOSED"
+                );
+    }
+
+    private static Label statusBadge(
+            String status
+    ) {
+
+        Label badge =
+                new Label(
+                        "Status : " +
+                                safe(status)
+                );
+
+        String color;
+
+        if (
+                status.equalsIgnoreCase(
+                        "Approved"
+                ) ||
+                status.equalsIgnoreCase(
+                        "Resolved"
+                ) ||
+                status.equalsIgnoreCase(
+                        "Completed"
+                ) ||
+                status.equalsIgnoreCase(
+                        "Paid"
+                )
+        ) {
+
+            color = GREEN;
+
+        } else if (
+                status.equalsIgnoreCase(
+                        "Rejected"
+                )
+        ) {
+
+            color = RED;
+
+        } else if (
+                status.equalsIgnoreCase(
+                        "Acknowledged"
+                )
+        ) {
+
+            color = ORANGE;
+
+        } else {
+
+            color = PRIMARY;
+        }
+
+        badge.setFont(
                 Font.font(
                         "Segoe UI",
                         FontWeight.BOLD,
-                        30
+                        13
                 )
         );
 
-        Label sub =
-                new Label(subtitle);
-
-        sub.setTextFill(
-                Color.web("#A99CB8")
+        badge.setTextFill(
+                Color.web(color)
         );
 
-        box.getChildren().addAll(
-                heading,
-                sub
+        return badge;
+    }
+
+    private static double getDouble(
+            Map<String, Object> data,
+            String key
+    ) {
+
+        Object value =
+                data.get(key);
+
+        if (value == null) {
+            return 0;
+        }
+
+        if (value instanceof Number) {
+
+            return (
+                    (Number) value
+            ).doubleValue();
+        }
+
+        try {
+
+            return Double.parseDouble(
+                    value.toString()
+            );
+
+        } catch (Exception e) {
+
+            return 0;
+        }
+    }
+
+    private static String formatCurrency(
+            double amount
+    ) {
+
+        return String.format(
+                "₹%,.2f",
+                amount
+        );
+    }
+
+    private static double calculateDistance(
+            double lat1,
+            double lon1,
+            double lat2,
+            double lon2
+    ) {
+
+        final int EARTH_RADIUS =
+                6371000;
+
+        double latDistance =
+                Math.toRadians(
+                        lat2 - lat1
+                );
+
+        double lonDistance =
+                Math.toRadians(
+                        lon2 - lon1
+                );
+
+        double a =
+                Math.sin(
+                        latDistance / 2
+                )
+                        * Math.sin(
+                        latDistance / 2
+                )
+                        + Math.cos(
+                        Math.toRadians(lat1)
+                )
+                        * Math.cos(
+                        Math.toRadians(lat2)
+                )
+                        * Math.sin(
+                        lonDistance / 2
+                )
+                        * Math.sin(
+                        lonDistance / 2
+                );
+
+        return EARTH_RADIUS
+                * 2
+                * Math.atan2(
+                        Math.sqrt(a),
+                        Math.sqrt(1 - a)
+                );
+    }
+
+    private static ScrollPane simpleInfoPage(
+            String title,
+            String subtitle,
+            String... values
+    ) {
+
+        VBox content =
+                new VBox(20);
+
+        content.setPadding(
+                new Insets(30)
         );
 
+        content.getChildren().add(
+                pageHeading(
+                        title,
+                        subtitle
+                )
+        );
+
+        content.getChildren().add(
+                infoPanel(
+                        title,
+                        values
+                )
+        );
+
+        return createScroll(content);
+    }
+
+    private static VBox dashboardCard(
+            String icon,
+            String title,
+            String value,
+            String subtitle,
+            String accent
+    ) {
+
+        VBox box =
+                new VBox(7);
+
+        box.setPadding(
+                new Insets(20)
+        );
+
+        box.setPrefWidth(240);
+
+        box.setMinHeight(145);
+
+        box.setStyle(
+                "-fx-background-color:" +
+                        card() +
+                        ";" +
+                        "-fx-background-radius:14;" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-radius:14;" +
+                        "-fx-cursor:hand;"
+        );
+
+        Label iconLabel =
+                pageText(
+                        icon,
+                        25,
+                        false,
+                        accent
+                );
+
+        Label titleLabel =
+                pageText(
+                        title,
+                        11,
+                        true,
+                        muted()
+                );
+
+        Label valueLabel =
+                pageText(
+                        value,
+                        23,
+                        true,
+                        text()
+                );
+
+        Label subtitleLabel =
+                pageText(
+                        subtitle,
+                        11,
+                        false,
+                        muted()
+                );
+
         box.getChildren().addAll(
-                nodes
+                iconLabel,
+                titleLabel,
+                valueLabel,
+                subtitleLabel
         );
 
         return box;
     }
 
-    private static TextField input(
-            String prompt,
+    private static VBox whitePanel() {
+
+        VBox box =
+                new VBox(12);
+
+        box.setPadding(
+                new Insets(20)
+        );
+
+        box.setStyle(
+                "-fx-background-color:" +
+                        panel() +
+                        ";" +
+                        "-fx-background-radius:14;" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-radius:14;"
+        );
+
+        return box;
+    }
+
+    private static VBox whitePanelWithMessage(
+            String message
+    ) {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                infoLabel(message)
+        );
+
+        return box;
+    }
+
+    private static Label sectionTitle(
             String value
     ) {
 
-        TextField field =
-                new TextField(value);
-
-        field.setPromptText(prompt);
-
-        field.setPrefWidth(360);
-
-        field.setPrefHeight(45);
-
-        field.setStyle(
-                "-fx-background-color: #181027;" +
-                "-fx-text-fill: white;" +
-                "-fx-prompt-text-fill: #80758F;" +
-                "-fx-background-radius: 12px;" +
-                "-fx-border-color: #352451;" +
-                "-fx-border-radius: 12px;" +
-                "-fx-padding: 0 14px;"
+        return pageText(
+                value,
+                18,
+                true,
+                text()
         );
-
-        return field;
     }
 
-    private static Label fieldLabel(
-            String text
+    private static VBox pageHeading(
+            String title,
+            String subtitle
+    ) {
+
+        VBox box =
+                new VBox(5);
+
+        box.getChildren().addAll(
+
+                pageText(
+                        title,
+                        26,
+                        true,
+                        text()
+                ),
+
+                pageText(
+                        subtitle,
+                        13,
+                        false,
+                        muted()
+                )
+        );
+
+        return box;
+    }
+
+    private static VBox infoPanel(
+            String title,
+            String... values
+    ) {
+
+        VBox box =
+                whitePanel();
+
+        box.getChildren().add(
+                sectionTitle(title)
+        );
+
+        for (
+                String value :
+                values
+        ) {
+
+            box.getChildren().add(
+                    infoLabel(value)
+            );
+        }
+
+        return box;
+    }
+
+    private static Label settingDescription(
+            String value
     ) {
 
         Label label =
-                new Label(text);
+                pageText(
+                        value,
+                        13,
+                        false,
+                        muted()
+                );
 
-        label.setTextFill(
-                Color.web("#BFA3FF")
+        label.setWrapText(true);
+
+        return label;
+    }
+
+    private static Label settingLabel(
+            String value
+    ) {
+
+        return pageText(
+                value,
+                13,
+                false,
+                secondary()
         );
+    }
+
+    private static Label announcement(
+            String title,
+            String description
+    ) {
+
+        Label label =
+                pageText(
+                        "📌  " +
+                                title +
+                                "\n      " +
+                                description,
+                        13,
+                        false,
+                        secondary()
+                );
+
+        label.setWrapText(true);
+
+        return label;
+    }
+
+    private static Label menuRow(
+            String icon,
+            String title,
+            String food
+    ) {
+
+        Label label =
+                pageText(
+                        icon +
+                                "  " +
+                                title +
+                                "  →  " +
+                                food,
+                        12,
+                        false,
+                        secondary()
+                );
+
+        label.setWrapText(true);
+
+        return label;
+    }
+
+    private static Label activityRow(
+            String icon,
+            String title,
+            String status
+    ) {
+
+        Label label =
+                pageText(
+                        icon +
+                                "   " +
+                                title +
+                                "\n       Status : " +
+                                status,
+                        13,
+                        false,
+                        secondary()
+                );
+
+        label.setWrapText(true);
+
+        return label;
+    }
+
+    private static Label fieldLabel(
+            String value
+    ) {
+
+        return pageText(
+                value,
+                13,
+                true,
+                secondary()
+        );
+    }
+
+    private static Label infoLabel(
+            String value
+    ) {
+
+        Label label =
+                pageText(
+                        value,
+                        14,
+                        false,
+                        secondary()
+                );
+
+        label.setWrapText(true);
+
+        return label;
+    }
+
+    private static Label pageText(
+            String value,
+            double size,
+            boolean bold,
+            String color
+    ) {
+
+        Label label =
+                new Label(value);
 
         label.setFont(
                 Font.font(
                         "Segoe UI",
-                        FontWeight.BOLD,
-                        12
+                        bold
+                                ? FontWeight.BOLD
+                                : FontWeight.NORMAL,
+                        size
                 )
+        );
+
+        label.setTextFill(
+                Color.web(color)
         );
 
         return label;
     }
 
-    private static Button primaryButton(
-            String text
-    ) {
-
-        Button button =
-                new Button(text);
-
-        button.setPrefWidth(260);
-
-        button.setPrefHeight(48);
-
-        button.setStyle(
-                "-fx-background-color: linear-gradient(" +
-                "to right, #7437E8, #A064FF);" +
-                "-fx-text-fill: white;" +
-                "-fx-font-family: 'Segoe UI';" +
-                "-fx-font-weight: bold;" +
-                "-fx-background-radius: 25px;" +
-                "-fx-cursor: hand;"
-        );
-
-        return button;
-    }
-
     private static Button menuButton(
             String icon,
-            String text
+            String textValue
     ) {
 
         Button button =
                 new Button(
-                        icon + "   " + text
+                        icon +
+                                "   " +
+                                textValue
                 );
 
         button.setMaxWidth(
                 Double.MAX_VALUE
         );
 
-        button.setPrefHeight(45);
+        button.setPrefHeight(43);
 
         button.setAlignment(
                 Pos.CENTER_LEFT
@@ -1272,93 +4910,341 @@ public class StudentDashboard {
         button.setPadding(
                 new Insets(
                         0,
-                        15,
+                        12,
                         0,
-                        15
+                        12
                 )
         );
 
         button.setStyle(
-                "-fx-background-color: transparent;" +
-                "-fx-text-fill: #BDB1D0;" +
-                "-fx-font-family: 'Segoe UI';" +
-                "-fx-font-size: 13px;" +
-                "-fx-background-radius: 10px;" +
-                "-fx-cursor: hand;"
+                "-fx-background-color:transparent;" +
+                        "-fx-text-fill:#D1D5DB;" +
+                        "-fx-font-family:'Segoe UI';" +
+                        "-fx-font-size:13px;" +
+                        "-fx-background-radius:9;" +
+                        "-fx-cursor:hand;"
         );
 
-        button.setOnMouseEntered(e ->
-                button.setStyle(
-                        "-fx-background-color: #25163A;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-family: 'Segoe UI';" +
-                        "-fx-font-size: 13px;" +
-                        "-fx-background-radius: 10px;" +
-                        "-fx-cursor: hand;"
+        button.setOnMouseEntered(
+                e -> button.setStyle(
+                        "-fx-background-color:#1F2937;" +
+                                "-fx-text-fill:#FFFFFF;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-background-radius:9;" +
+                                "-fx-cursor:hand;"
                 )
         );
 
-        button.setOnMouseExited(e ->
-                button.setStyle(
-                        "-fx-background-color: transparent;" +
-                        "-fx-text-fill: #BDB1D0;" +
-                        "-fx-font-family: 'Segoe UI';" +
-                        "-fx-font-size: 13px;" +
-                        "-fx-background-radius: 10px;" +
-                        "-fx-cursor: hand;"
+        button.setOnMouseExited(
+                e -> button.setStyle(
+                        "-fx-background-color:transparent;" +
+                                "-fx-text-fill:#D1D5DB;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-background-radius:9;" +
+                                "-fx-cursor:hand;"
                 )
         );
 
         return button;
     }
 
-    private static Label sectionLabel(
-            String text
+    private static Button quickButton(
+            String icon,
+            String textValue,
+            String accent
     ) {
 
-        Label label =
-                new Label(text);
-
-        label.setTextFill(
-                Color.web("#675B74")
-        );
-
-        label.setFont(
-                Font.font(
-                        "Segoe UI",
-                        FontWeight.BOLD,
-                        10
-                )
-        );
-
-        label.setPadding(
-                new Insets(
-                        10,
-                        10,
-                        5,
-                        10
-                )
-        );
-
-        return label;
-    }
-
-    private static void scale(
-            Button button,
-            double value
-    ) {
-
-        ScaleTransition animation =
-                new ScaleTransition(
-                        Duration.millis(150),
-                        button
+        Button button =
+                new Button(
+                        icon +
+                                "\n" +
+                                textValue
                 );
 
-        animation.setToX(value);
+        button.setPrefSize(
+                170,
+                75
+        );
 
-        animation.setToY(value);
+        button.setStyle(
+                "-fx-background-color:" +
+                        card() +
+                        ";" +
+                        "-fx-text-fill:" +
+                        secondary() +
+                        ";" +
+                        "-fx-font-family:'Segoe UI';" +
+                        "-fx-font-size:13px;" +
+                        "-fx-font-weight:bold;" +
+                        "-fx-background-radius:14;" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-radius:14;" +
+                        "-fx-cursor:hand;"
+        );
 
-        animation.play();
+        button.setOnMouseEntered(
+                e -> button.setStyle(
+                        "-fx-background-color:" +
+                                accent +
+                                ";" +
+                                "-fx-text-fill:white;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-font-weight:bold;" +
+                                "-fx-background-radius:14;" +
+                                "-fx-border-color:" +
+                                accent +
+                                ";" +
+                                "-fx-border-radius:14;" +
+                                "-fx-cursor:hand;"
+                )
+        );
+
+        button.setOnMouseExited(
+                e -> button.setStyle(
+                        "-fx-background-color:" +
+                                card() +
+                                ";" +
+                                "-fx-text-fill:" +
+                                secondary() +
+                                ";" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-font-weight:bold;" +
+                                "-fx-background-radius:14;" +
+                                "-fx-border-color:" +
+                                border() +
+                                ";" +
+                                "-fx-border-radius:14;" +
+                                "-fx-cursor:hand;"
+                )
+        );
+
+        return button;
+    }
+
+    private static Button primaryButton(
+            String value
+    ) {
+
+        Button button =
+                new Button(value);
+
+        button.setPrefWidth(230);
+
+        button.setPrefHeight(45);
+
+        button.setStyle(
+                "-fx-background-color:" +
+                        PRIMARY +
+                        ";" +
+                        "-fx-text-fill:white;" +
+                        "-fx-font-family:'Segoe UI';" +
+                        "-fx-font-size:13px;" +
+                        "-fx-font-weight:bold;" +
+                        "-fx-background-radius:10;" +
+                        "-fx-cursor:hand;"
+        );
+
+        button.setOnMouseEntered(
+                e -> button.setStyle(
+                        "-fx-background-color:" +
+                                PRIMARY_DARK +
+                                ";" +
+                                "-fx-text-fill:white;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-font-weight:bold;" +
+                                "-fx-background-radius:10;" +
+                                "-fx-cursor:hand;"
+                )
+        );
+
+        button.setOnMouseExited(
+                e -> button.setStyle(
+                        "-fx-background-color:" +
+                                PRIMARY +
+                                ";" +
+                                "-fx-text-fill:white;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-font-weight:bold;" +
+                                "-fx-background-radius:10;" +
+                                "-fx-cursor:hand;"
+                )
+        );
+
+        return button;
+    }
+
+    private static Button secondaryButton(
+            String value
+    ) {
+
+        Button button =
+                new Button(value);
+
+        button.setPrefWidth(230);
+
+        button.setPrefHeight(45);
+
+        button.setStyle(
+                "-fx-background-color:" +
+                        card() +
+                        ";" +
+                        "-fx-text-fill:" +
+                        secondary() +
+                        ";" +
+                        "-fx-font-family:'Segoe UI';" +
+                        "-fx-font-size:13px;" +
+                        "-fx-font-weight:bold;" +
+                        "-fx-background-radius:10;" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-radius:10;" +
+                        "-fx-cursor:hand;"
+        );
+
+        return button;
+    }
+
+    private static Button dangerButton(
+            String value
+    ) {
+
+        Button button =
+                new Button(value);
+
+        button.setPrefWidth(230);
+
+        button.setPrefHeight(45);
+
+        button.setStyle(
+                "-fx-background-color:" +
+                        RED +
+                        ";" +
+                        "-fx-text-fill:white;" +
+                        "-fx-font-family:'Segoe UI';" +
+                        "-fx-font-size:13px;" +
+                        "-fx-font-weight:bold;" +
+                        "-fx-background-radius:10;" +
+                        "-fx-cursor:hand;"
+        );
+
+        button.setOnMouseEntered(
+                e -> button.setStyle(
+                        "-fx-background-color:#B91C1C;" +
+                                "-fx-text-fill:white;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-font-weight:bold;" +
+                                "-fx-background-radius:10;" +
+                                "-fx-cursor:hand;"
+                )
+        );
+
+        button.setOnMouseExited(
+                e -> button.setStyle(
+                        "-fx-background-color:" +
+                                RED +
+                                ";" +
+                                "-fx-text-fill:white;" +
+                                "-fx-font-family:'Segoe UI';" +
+                                "-fx-font-size:13px;" +
+                                "-fx-font-weight:bold;" +
+                                "-fx-background-radius:10;" +
+                                "-fx-cursor:hand;"
+                )
+        );
+
+        return button;
+    }
+
+    private static String inputStyle() {
+
+        return
+                "-fx-background-color:" +
+                        inputBg() +
+                        ";" +
+                        "-fx-text-fill:" +
+                        text() +
+                        ";" +
+                        "-fx-prompt-text-fill:" +
+                        muted() +
+                        ";" +
+                        "-fx-border-color:" +
+                        border() +
+                        ";" +
+                        "-fx-border-radius:8;" +
+                        "-fx-background-radius:8;";
+    }
+
+    private static ScrollPane createScroll(
+            VBox content
+    ) {
+
+        ScrollPane scroll =
+                new ScrollPane(content);
+
+        scroll.setFitToWidth(true);
+
+        scroll.setHbarPolicy(
+                ScrollPane.ScrollBarPolicy.NEVER
+        );
+
+        scroll.setStyle(
+                "-fx-background-color:" +
+                        bg() +
+                        ";" +
+                        "-fx-background:" +
+                        bg() +
+                        ";"
+        );
+
+        return scroll;
+    }
+
+    private static String safe(
+            String value
+    ) {
+
+        return value == null ||
+                value.trim().isEmpty()
+                ? "Not Available"
+                : value;
+    }
+
+    private static String safeValue(
+            String value,
+            String fallback
+    ) {
+
+        return value == null ||
+                value.trim().isEmpty()
+                ? fallback
+                : value;
+    }
+
+    private static String safeObject(
+            Object value,
+            String fallback
+    ) {
+
+        if (value == null) {
+            return fallback;
+        }
+
+        String result =
+                value.toString();
+
+        return result.trim().isEmpty()
+                ? fallback
+                : result;
     }
 
     private static void showMessage(
@@ -1374,7 +5260,9 @@ public class StudentDashboard {
                 "Hostel Hub"
         );
 
-        alert.setHeaderText(null);
+        alert.setHeaderText(
+                null
+        );
 
         alert.setContentText(
                 message
@@ -1382,17 +5270,5 @@ public class StudentDashboard {
 
         alert.showAndWait();
     }
-
-    private static String safe(
-            String value
-    ) {
-
-        if (value == null ||
-                value.trim().isEmpty()) {
-
-            return "Not Available";
-        }
-
-        return value;
-    }
 }
+

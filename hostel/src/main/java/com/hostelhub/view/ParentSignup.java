@@ -1,8 +1,9 @@
+
 package com.hostelhub.view;
 
+import com.google.cloud.firestore.FieldValue;
+import com.hostelhub.config.FirebaseConfig;
 import com.hostelhub.controller.FirebaseAuthController;
-import com.hostelhub.dao.FirestoreStudentDao;
-import com.hostelhub.model.Student;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -25,9 +26,11 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
-public class StudentLogin {
+public class ParentSignup {
 
         public static void show() {
 
@@ -48,12 +51,12 @@ public class StudentLogin {
                 addBackgroundGlow(center);
                 addParticles(center);
 
-                VBox card = new VBox(16);
+                VBox card = new VBox(12);
 
                 card.setAlignment(Pos.CENTER);
-                card.setPrefWidth(430);
-                card.setMaxWidth(430);
-                card.setPadding(new Insets(40));
+                card.setPrefWidth(450);
+                card.setMaxWidth(450);
+                card.setPadding(new Insets(32, 40, 30, 40));
 
                 card.setStyle("""
                                 -fx-background-color: linear-gradient(
@@ -85,7 +88,7 @@ public class StudentLogin {
                                 -fx-font-weight: bold;
                                 """);
 
-                Label title = new Label("Student Login");
+                Label title = new Label("Parent Sign Up");
 
                 title.setStyle("""
                                 -fx-text-fill: white;
@@ -95,7 +98,7 @@ public class StudentLogin {
                                 """);
 
                 Label subtitle = new Label(
-                                "Login to access your hostel account");
+                                "Create your parent hostel account");
 
                 subtitle.setStyle("""
                                 -fx-text-fill: #BDB1D0;
@@ -103,11 +106,35 @@ public class StudentLogin {
                                 -fx-font-size: 14px;
                                 """);
 
+                TextField fullName = new TextField();
+
+                fullName.setPromptText("Full Name");
+
+                styleField(fullName);
+
                 TextField email = new TextField();
 
                 email.setPromptText("Email Address");
 
                 styleField(email);
+
+                TextField phone = new TextField();
+
+                phone.setPromptText("Phone Number");
+
+                styleField(phone);
+
+                TextField studentName = new TextField();
+
+                studentName.setPromptText("Student Name");
+
+                styleField(studentName);
+
+                TextField studentId = new TextField();
+
+                studentId.setPromptText("Student ID");
+
+                styleField(studentId);
 
                 PasswordField password = new PasswordField();
 
@@ -115,15 +142,11 @@ public class StudentLogin {
 
                 styleField(password);
 
-                Hyperlink forgot = new Hyperlink(
-                                "Forgot Password?");
+                PasswordField confirmPassword = new PasswordField();
 
-                forgot.setStyle("""
-                                -fx-text-fill: #A064FF;
-                                -fx-font-family: 'Segoe UI';
-                                -fx-font-size: 13px;
-                                -fx-cursor: hand;
-                                """);
+                confirmPassword.setPromptText("Confirm Password");
+
+                styleField(confirmPassword);
 
                 Label message = new Label();
 
@@ -133,17 +156,17 @@ public class StudentLogin {
                                 -fx-font-size: 13px;
                                 """);
 
-                Button login = new Button("LOGIN");
+                Button signup = new Button("CREATE ACCOUNT");
 
-                login.setPrefWidth(340);
-                login.setPrefHeight(50);
+                signup.setPrefWidth(340);
+                signup.setPrefHeight(50);
 
-                styleButton(login);
+                styleButton(signup);
 
-                Hyperlink signup = new Hyperlink(
-                                "New User?  Sign Up");
+                Hyperlink login = new Hyperlink(
+                                "Already have an account?  Login");
 
-                signup.setStyle("""
+                login.setStyle("""
                                 -fx-text-fill: #BFA3FF;
                                 -fx-font-family: 'Segoe UI';
                                 -fx-font-size: 14px;
@@ -151,7 +174,7 @@ public class StudentLogin {
                                 """);
 
                 Hyperlink back = new Hyperlink(
-                                "← Back to Role Selection");
+                                "← Back to Parent Login");
 
                 back.setStyle("""
                                 -fx-text-fill: #9183A5;
@@ -160,32 +183,32 @@ public class StudentLogin {
                                 -fx-cursor: hand;
                                 """);
 
-                login.setOnMouseEntered(e -> {
+                signup.setOnMouseEntered(e -> {
 
                         ScaleTransition animation = new ScaleTransition(
                                         Duration.millis(150),
-                                        login);
+                                        signup);
 
                         animation.setToX(1.06);
                         animation.setToY(1.06);
                         animation.play();
                 });
 
-                login.setOnMouseExited(e -> {
+                signup.setOnMouseExited(e -> {
 
                         ScaleTransition animation = new ScaleTransition(
                                         Duration.millis(150),
-                                        login);
+                                        signup);
 
                         animation.setToX(1);
                         animation.setToY(1);
                         animation.play();
                 });
 
-                signup.setOnMouseEntered(e -> signup.setTextFill(
+                login.setOnMouseEntered(e -> login.setTextFill(
                                 Color.web("#D3BFFF")));
 
-                signup.setOnMouseExited(e -> signup.setTextFill(
+                login.setOnMouseExited(e -> login.setTextFill(
                                 Color.web("#BFA3FF")));
 
                 back.setOnMouseEntered(e -> back.setTextFill(
@@ -194,14 +217,29 @@ public class StudentLogin {
                 back.setOnMouseExited(e -> back.setTextFill(
                                 Color.web("#9183A5")));
 
-                login.setOnAction(e -> {
+                signup.setOnAction(e -> {
+
+                        String name = fullName.getText().trim();
 
                         String emailText = email.getText().trim();
 
+                        String phoneText = phone.getText().trim();
+
+                        String studentText = studentName.getText().trim();
+
+                        String studentIdText = studentId.getText().trim();
+
                         String passwordText = password.getText();
 
-                        if (emailText.isEmpty()
-                                        || passwordText.isEmpty()) {
+                        String confirmText = confirmPassword.getText();
+
+                        if (name.isEmpty()
+                                        || emailText.isEmpty()
+                                        || phoneText.isEmpty()
+                                        || studentText.isEmpty()
+                                        || studentIdText.isEmpty()
+                                        || passwordText.isEmpty()
+                                        || confirmText.isEmpty()) {
 
                                 message.setText(
                                                 "Please fill in all fields.");
@@ -211,131 +249,191 @@ public class StudentLogin {
                                 return;
                         }
 
-                        login.setDisable(true);
+                        if (!emailText.matches(
+                                        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
 
-                        try {
+                                message.setText(
+                                                "Please enter a valid email address.");
 
-                                FirebaseAuthController.AuthResult result = FirebaseAuthController.signIn(
-                                                emailText,
-                                                passwordText);
+                                shake(card);
 
-                                if (result.isSuccess()) {
+                                return;
+                        }
+
+                        if (!phoneText.matches("\\d{10}")) {
+
+                                message.setText(
+                                                "Please enter a valid 10 digit phone number.");
+
+                                shake(card);
+
+                                return;
+                        }
+
+                        if (passwordText.length() < 6) {
+
+                                message.setText(
+                                                "Password must contain at least 6 characters.");
+
+                                shake(card);
+
+                                return;
+                        }
+
+                        if (!passwordText.equals(confirmText)) {
+
+                                message.setText(
+                                                "Passwords do not match.");
+
+                                shake(card);
+
+                                return;
+                        }
+
+                        signup.setDisable(true);
+
+                        message.setStyle("""
+                                        -fx-text-fill: #BFA3FF;
+                                        -fx-font-size: 13px;
+                                        """);
+
+                        message.setText(
+                                        "Creating parent account...");
+
+                        Thread thread = new Thread(() -> {
+
+                                try {
+
+                                        FirebaseAuthController.AuthResult result = FirebaseAuthController
+                                                        .signUpAndGetResult(
+                                                                        emailText,
+                                                                        passwordText);
+
+                                        if (!result.isSuccess()) {
+
+                                                Platform.runLater(() -> {
+
+                                                        signup.setDisable(false);
+
+                                                        message.setStyle("""
+                                                                        -fx-text-fill: #FF8FA3;
+                                                                        -fx-font-size: 13px;
+                                                                        """);
+
+                                                        message.setText(
+                                                                        getFirebaseError(
+                                                                                        result.getErrorMessage()));
+
+                                                        shake(card);
+                                                });
+
+                                                return;
+                                        }
 
                                         String uid = result.getUid();
 
-                                        System.out.println(
-                                                        "LOGIN SUCCESS");
+                                        Map<String, Object> parentData = new HashMap<>();
 
-                                        System.out.println(
-                                                        "Logged in UID: " + uid);
+                                        parentData.put(
+                                                        "uid",
+                                                        uid);
 
-                                        message.setStyle("""
-                                                        -fx-text-fill: #BFA3FF;
-                                                        -fx-font-size: 13px;
-                                                        """);
+                                        parentData.put(
+                                                        "role",
+                                                        "PARENT");
 
-                                        message.setText(
-                                                        "Loading student profile...");
+                                        parentData.put(
+                                                        "fullName",
+                                                        name);
 
-                                        Thread thread = new Thread(() -> {
+                                        parentData.put(
+                                                        "email",
+                                                        emailText);
 
-                                                try {
+                                        parentData.put(
+                                                        "phone",
+                                                        phoneText);
 
-                                                        FirestoreStudentDao dao = new FirestoreStudentDao();
+                                        parentData.put(
+                                                        "studentName",
+                                                        studentText);
 
-                                                        Student student = dao.getStudentByUid(uid);
+                                        parentData.put(
+                                                        "studentId",
+                                                        studentIdText);
 
-                                                        Platform.runLater(() -> {
+                                        parentData.put(
+                                                        "createdAt",
+                                                        FieldValue.serverTimestamp());
 
-                                                                login.setDisable(false);
+                                        FirebaseConfig
+                                                        .getFireStore()
+                                                        .collection("parents")
+                                                        .document(uid)
+                                                        .set(parentData)
+                                                        .get();
 
-                                                                if (student != null) {
+                                        Platform.runLater(() -> {
 
-                                                                        System.out.println(
-                                                                                        "Student Name: "
-                                                                                                        + student.getFullName());
+                                                signup.setDisable(false);
 
-                                                                        System.out.println(
-                                                                                        "Student Email: "
-                                                                                                        + student.getEmail());
+                                                message.setStyle("""
+                                                                -fx-text-fill: #BFA3FF;
+                                                                -fx-font-size: 13px;
+                                                                """);
 
-                                                                        StudentDashboard.show(
-                                                                                        student);
+                                                message.setText(
+                                                                "Account created successfully!");
 
-                                                                } else {
+                                                System.out.println(
+                                                                "PARENT SIGNUP SUCCESS");
 
-                                                                        message.setStyle("""
-                                                                                        -fx-text-fill: #FF8FA3;
-                                                                                        -fx-font-size: 13px;
-                                                                                        """);
+                                                System.out.println(
+                                                                "Parent UID: " + uid);
 
-                                                                        message.setText(
-                                                                                        "Student profile not found.");
+                                                new Thread(() -> {
 
-                                                                        shake(card);
-                                                                }
-                                                        });
+                                                        try {
 
-                                                } catch (Exception ex) {
+                                                                Thread.sleep(700);
 
-                                                        ex.printStackTrace();
+                                                        } catch (InterruptedException ignored) {
+                                                        }
 
-                                                        Platform.runLater(() -> {
+                                                        Platform.runLater(
+                                                                        ParentLogin::show);
 
-                                                                login.setDisable(false);
-
-                                                                message.setStyle("""
-                                                                                -fx-text-fill: #FF8FA3;
-                                                                                -fx-font-size: 13px;
-                                                                                """);
-
-                                                                message.setText(
-                                                                                "Unable to load student profile.");
-
-                                                                shake(card);
-                                                        });
-                                                }
-
+                                                }).start();
                                         });
 
-                                        thread.setDaemon(true);
-                                        thread.start();
+                                } catch (Exception ex) {
 
-                                } else {
+                                        ex.printStackTrace();
 
-                                        login.setDisable(false);
+                                        Platform.runLater(() -> {
 
-                                        message.setStyle("""
-                                                        -fx-text-fill: #FF8FA3;
-                                                        -fx-font-size: 13px;
-                                                        """);
+                                                signup.setDisable(false);
 
-                                        message.setText(
-                                                        "Invalid email or password.");
+                                                message.setStyle("""
+                                                                -fx-text-fill: #FF8FA3;
+                                                                -fx-font-size: 13px;
+                                                                """);
 
-                                        shake(card);
+                                                message.setText(
+                                                                "Signup error: "
+                                                                                + ex.getMessage());
+
+                                                shake(card);
+                                        });
                                 }
 
-                        } catch (Exception ex) {
+                        });
 
-                                login.setDisable(false);
-
-                                ex.printStackTrace();
-
-                                message.setStyle("""
-                                                -fx-text-fill: #FF8FA3;
-                                                -fx-font-size: 13px;
-                                                """);
-
-                                message.setText(
-                                                "Login error: "
-                                                                + ex.getMessage());
-
-                                shake(card);
-                        }
+                        thread.setDaemon(true);
+                        thread.start();
                 });
 
-                signup.setOnAction(e -> StudentSignUp.show());
+                login.setOnAction(e -> ParentLogin.show());
 
                 back.setOnAction(e -> {
 
@@ -346,32 +444,25 @@ public class StudentLogin {
                         fade.setFromValue(1);
                         fade.setToValue(0);
 
-                        fade.setOnFinished(event -> RoleSelection.show());
+                        fade.setOnFinished(event -> ParentLogin.show());
 
                         fade.play();
-                });
-
-                forgot.setOnAction(e -> {
-
-                        message.setStyle("""
-                                        -fx-text-fill: #BFA3FF;
-                                        -fx-font-size: 13px;
-                                        """);
-
-                        message.setText(
-                                        "Password reset will be available soon.");
                 });
 
                 card.getChildren().addAll(
                                 logo,
                                 title,
                                 subtitle,
+                                fullName,
                                 email,
+                                phone,
+                                studentName,
+                                studentId,
                                 password,
-                                forgot,
+                                confirmPassword,
                                 message,
-                                login,
                                 signup,
+                                login,
                                 back);
 
                 center.getChildren().add(card);
@@ -391,12 +482,16 @@ public class StudentLogin {
                                 logo,
                                 title,
                                 subtitle,
+                                fullName,
                                 email,
+                                phone,
+                                studentName,
+                                studentId,
                                 password,
-                                forgot,
+                                confirmPassword,
                                 message,
-                                login,
                                 signup,
+                                login,
                                 back);
         }
 
@@ -405,12 +500,16 @@ public class StudentLogin {
                         Label logo,
                         Label title,
                         Label subtitle,
+                        TextField fullName,
                         TextField email,
+                        TextField phone,
+                        TextField studentName,
+                        TextField studentId,
                         PasswordField password,
-                        Hyperlink forgot,
+                        PasswordField confirmPassword,
                         Label message,
-                        Button login,
-                        Hyperlink signup,
+                        Button signup,
+                        Hyperlink login,
                         Hyperlink back) {
 
                 card.setOpacity(0);
@@ -427,12 +526,16 @@ public class StudentLogin {
                 title.setScaleY(0.85);
 
                 subtitle.setOpacity(0);
+                fullName.setOpacity(0);
                 email.setOpacity(0);
+                phone.setOpacity(0);
+                studentName.setOpacity(0);
+                studentId.setOpacity(0);
                 password.setOpacity(0);
-                forgot.setOpacity(0);
+                confirmPassword.setOpacity(0);
                 message.setOpacity(0);
-                login.setOpacity(0);
                 signup.setOpacity(0);
+                login.setOpacity(0);
                 back.setOpacity(0);
 
                 FadeTransition cardFade = new FadeTransition(
@@ -465,22 +568,26 @@ public class StudentLogin {
 
                 animateNode(
                                 logo,
-                                200,
+                                150,
                                 0.80);
 
                 animateNode(
                                 title,
-                                350,
+                                250,
                                 0.85);
 
-                fadeNode(subtitle, 500);
-                fadeNode(email, 650);
-                fadeNode(password, 750);
-                fadeNode(forgot, 850);
-                fadeNode(message, 900);
-                fadeNode(login, 950);
-                fadeNode(signup, 1050);
-                fadeNode(back, 1150);
+                fadeNode(subtitle, 350);
+                fadeNode(fullName, 450);
+                fadeNode(email, 550);
+                fadeNode(phone, 650);
+                fadeNode(studentName, 750);
+                fadeNode(studentId, 850);
+                fadeNode(password, 950);
+                fadeNode(confirmPassword, 1050);
+                fadeNode(message, 1100);
+                fadeNode(signup, 1150);
+                fadeNode(login, 1250);
+                fadeNode(back, 1350);
         }
 
         private static void animateNode(
@@ -533,7 +640,7 @@ public class StudentLogin {
                         TextField field) {
 
                 field.setPrefWidth(340);
-                field.setPrefHeight(48);
+                field.setPrefHeight(43);
 
                 field.setStyle("""
                                 -fx-background-color: #181027;
@@ -628,6 +735,32 @@ public class StudentLogin {
                 shake.setCycleCount(5);
 
                 shake.play();
+        }
+
+        private static String getFirebaseError(
+                        String error) {
+
+                if (error == null) {
+                        return "Signup failed.";
+                }
+
+                if (error.contains("EMAIL_EXISTS")) {
+                        return "This email is already registered.";
+                }
+
+                if (error.contains("WEAK_PASSWORD")) {
+                        return "Password is too weak.";
+                }
+
+                if (error.contains("INVALID_EMAIL")) {
+                        return "Invalid email address.";
+                }
+
+                if (error.contains("NETWORK_REQUEST_FAILED")) {
+                        return "Network error. Check your internet connection.";
+                }
+
+                return error;
         }
 
         private static void addBackgroundGlow(

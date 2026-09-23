@@ -1,3 +1,4 @@
+
 package com.hostelhub.model;
 
 public class Student {
@@ -15,7 +16,13 @@ public class Student {
     private String city;
     private String roomPreference;
     private String address;
-   private String roomNumber;
+    private String roomNumber;
+
+    private String messPlan;
+    private double totalFee;
+    private double paidFee;
+    private double remainingFee;
+    private String feeStatus;
 
     public Student() {
     }
@@ -49,7 +56,7 @@ public class Student {
         this.city = city;
         this.roomPreference = roomPreference;
         this.address = address;
-        this.roomNumber=roomNumber;
+        this.roomNumber = roomNumber;
     }
 
     public String getUid() {
@@ -58,6 +65,10 @@ public class Student {
 
     public void setUid(String uid) {
         this.uid = uid;
+    }
+
+    public String getStudentId() {
+        return uid;
     }
 
     public String getFullName() {
@@ -152,15 +163,55 @@ public class Student {
         return address;
     }
 
-    public void setRoomNumber(String roomNumber) {
-        this.roomNumber = roomNumber;
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     public String getRoomNumber() {
         return roomNumber;
     }
 
-    public void setAddress(String address) {
-        this.address = address;
+    public void setRoomNumber(String roomNumber) {
+        this.roomNumber = roomNumber;
+    }
+
+    public String getMessPlan() {
+        return messPlan;
+    }
+
+    public void setMessPlan(String messPlan) {
+        this.messPlan = messPlan;
+    }
+
+    public double getTotalFee() {
+        return totalFee;
+    }
+
+    public void setTotalFee(double totalFee) {
+        this.totalFee = totalFee;
+    }
+
+    public double getPaidFee() {
+        return paidFee;
+    }
+
+    public void setPaidFee(double paidFee) {
+        this.paidFee = paidFee;
+    }
+
+    public double getRemainingFee() {
+        return remainingFee;
+    }
+
+    public void setRemainingFee(double remainingFee) {
+        this.remainingFee = remainingFee;
+    }
+
+    public String getFeeStatus() {
+        return feeStatus;
+    }
+
+    public void setFeeStatus(String feeStatus) {
+        this.feeStatus = feeStatus;
     }
 }

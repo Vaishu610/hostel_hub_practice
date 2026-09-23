@@ -1,8 +1,8 @@
+
 package com.hostelhub.view;
 
+import com.hostelhub.config.FirebaseConfig;
 import com.hostelhub.controller.FirebaseAuthController;
-import com.hostelhub.dao.FirestoreStudentDao;
-import com.hostelhub.model.Student;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -27,7 +27,7 @@ import javafx.util.Duration;
 
 import java.util.Random;
 
-public class StudentLogin {
+public class ParentLogin {
 
         public static void show() {
 
@@ -85,7 +85,7 @@ public class StudentLogin {
                                 -fx-font-weight: bold;
                                 """);
 
-                Label title = new Label("Student Login");
+                Label title = new Label("Parent Login");
 
                 title.setStyle("""
                                 -fx-text-fill: white;
@@ -95,7 +95,7 @@ public class StudentLogin {
                                 """);
 
                 Label subtitle = new Label(
-                                "Login to access your hostel account");
+                                "Login to access your parent account");
 
                 subtitle.setStyle("""
                                 -fx-text-fill: #BDB1D0;
@@ -211,6 +211,17 @@ public class StudentLogin {
                                 return;
                         }
 
+                        if (!emailText.matches(
+                                        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+
+                                message.setText(
+                                                "Please enter a valid email address.");
+
+                                shake(card);
+
+                                return;
+                        }
+
                         login.setDisable(true);
 
                         try {
@@ -224,7 +235,7 @@ public class StudentLogin {
                                         String uid = result.getUid();
 
                                         System.out.println(
-                                                        "LOGIN SUCCESS");
+                                                        "PARENT LOGIN SUCCESS");
 
                                         System.out.println(
                                                         "Logged in UID: " + uid);
@@ -235,32 +246,33 @@ public class StudentLogin {
                                                         """);
 
                                         message.setText(
-                                                        "Loading student profile...");
+                                                        "Loading parent profile...");
 
                                         Thread thread = new Thread(() -> {
 
                                                 try {
 
-                                                        FirestoreStudentDao dao = new FirestoreStudentDao();
-
-                                                        Student student = dao.getStudentByUid(uid);
+                                                        boolean parentExists = FirebaseConfig
+                                                                        .getFireStore()
+                                                                        .collection("parents")
+                                                                        .document(uid)
+                                                                        .get()
+                                                                        .get()
+                                                                        .exists();
 
                                                         Platform.runLater(() -> {
 
                                                                 login.setDisable(false);
 
-                                                                if (student != null) {
+                                                                if (parentExists) {
+
+                                                                        message.setText(
+                                                                                        "Login successful!");
 
                                                                         System.out.println(
-                                                                                        "Student Name: "
-                                                                                                        + student.getFullName());
+                                                                                        "Parent profile found.");
 
-                                                                        System.out.println(
-                                                                                        "Student Email: "
-                                                                                                        + student.getEmail());
-
-                                                                        StudentDashboard.show(
-                                                                                        student);
+                                                                        ParentDashboard.show(uid);
 
                                                                 } else {
 
@@ -270,7 +282,7 @@ public class StudentLogin {
                                                                                         """);
 
                                                                         message.setText(
-                                                                                        "Student profile not found.");
+                                                                                        "Parent profile not found.");
 
                                                                         shake(card);
                                                                 }
@@ -290,7 +302,7 @@ public class StudentLogin {
                                                                                 """);
 
                                                                 message.setText(
-                                                                                "Unable to load student profile.");
+                                                                                "Unable to load parent profile.");
 
                                                                 shake(card);
                                                         });
@@ -335,7 +347,7 @@ public class StudentLogin {
                         }
                 });
 
-                signup.setOnAction(e -> StudentSignUp.show());
+                signup.setOnAction(e -> ParentSignup.show());
 
                 back.setOnAction(e -> {
 

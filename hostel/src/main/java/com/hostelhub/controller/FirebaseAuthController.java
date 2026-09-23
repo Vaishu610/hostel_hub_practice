@@ -9,254 +9,91 @@ import java.net.http.HttpResponse;
 
 public class FirebaseAuthController {
 
-    private static final String API_KEY =
-            "AIzaSyAYnWwA6ha61NF-f64UGlNP6b5DJMnpR_4";
+    private static final String API_KEY = "AIzaSyAYnWwA6ha61NF-f64UGlNP6b5DJMnpR_4";
 
-    private static final HttpClient client =
-            HttpClient.newHttpClient();
+    private static final HttpClient client = HttpClient.newHttpClient();
 
-    public static AuthResult signUpAndGetResult(
-            String email,
-            String password) {
-
+    public static AuthResult signUpAndGetResult(String email, String password) {
         JSONObject payload = new JSONObject()
                 .put("email", email)
                 .put("password", password)
                 .put("returnSecureToken", true);
-
-        try {
-
-            URI uri = URI.create(
-                    "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key="
-                            + API_KEY
-            );
-
-            HttpRequest request =
-                    HttpRequest.newBuilder()
-                            .uri(uri)
-                            .header(
-                                    "Content-Type",
-                                    "application/json"
-                            )
-                            .POST(
-                                    HttpRequest.BodyPublishers
-                                            .ofString(payload.toString())
-                            )
-                            .build();
-
-            HttpResponse<String> response =
-                    client.send(
-                            request,
-                            HttpResponse.BodyHandlers.ofString()
-                    );
-
-            System.out.println(
-                    "Signup Status: "
-                            + response.statusCode()
-            );
-
-            System.out.println(
-                    "Signup Response: "
-                            + response.body()
-            );
-
-            if (response.statusCode() == 200) {
-
-                JSONObject json =
-                        new JSONObject(response.body());
-
-                String uid =
-                        json.getString("localId");
-
-                String idToken =
-                        json.getString("idToken");
-
-                return new AuthResult(
-                        true,
-                        uid,
-                        idToken,
-                        ""
-                );
-            }
-
-            JSONObject error =
-                    new JSONObject(response.body());
-
-            String message =
-                    "Signup failed";
-
-            if (error.has("error")) {
-
-                JSONObject errorObject =
-                        error.getJSONObject("error");
-
-                if (errorObject.has("message")) {
-
-                    message =
-                            errorObject.getString("message");
-                }
-            }
-
-            return new AuthResult(
-                    false,
-                    null,
-                    null,
-                    message
-            );
-
-        } catch (Exception e) {
-
-            e.printStackTrace();
-
-            return new AuthResult(
-                    false,
-                    null,
-                    null,
-                    e.getMessage()
-            );
-        }
+        return request("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + API_KEY, payload,
+                "Signup failed");
     }
 
-    public static boolean signUp(
-            String email,
-            String password) {
+    public static boolean signUp(String email, String password) {
+        return signUpAndGetResult(email, password).isSuccess();
+    }
 
-        AuthResult result =
-                signUpAndGetResult(
-                        email,
-                        password
-                );
+    public static AuthResult signIn(String email, String password) {
+        JSONObject payload = new JSONObject()
+                .put("email", email)
+                .put("password", password)
+                .put("returnSecureToken", true);
+        return request("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + API_KEY, payload,
+                "Login failed");
+    }
 
+    public static boolean changePassword(String email, String currentPassword, String newPassword) {
+        AuthResult login = signIn(email, currentPassword);
+        if (!login.isSuccess())
+            return false;
+
+        JSONObject payload = new JSONObject()
+                .put("idToken", login.getIdToken())
+                .put("password", newPassword)
+                .put("returnSecureToken", true);
+
+        AuthResult result = request(
+                "https://identitytoolkit.googleapis.com/v1/accounts:update?key=" + API_KEY,
+                payload,
+                "Password update failed");
         return result.isSuccess();
     }
 
-    public static AuthResult signIn(
-            String email,
-            String password) {
-
-        JSONObject payload =
-                new JSONObject()
-                        .put("email", email)
-                        .put("password", password)
-                        .put("returnSecureToken", true);
-
+    private static AuthResult request(String url, JSONObject payload, String defaultError) {
         try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
 
-            URI uri = URI.create(
-                    "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="
-                            + API_KEY
-            );
-
-            HttpRequest request =
-                    HttpRequest.newBuilder()
-                            .uri(uri)
-                            .header(
-                                    "Content-Type",
-                                    "application/json"
-                            )
-                            .POST(
-                                    HttpRequest.BodyPublishers
-                                            .ofString(payload.toString())
-                            )
-                            .build();
-
-            HttpResponse<String> response =
-                    client.send(
-                            request,
-                            HttpResponse.BodyHandlers.ofString()
-                    );
-
-            System.out.println(
-                    "Login Status: "
-                            + response.statusCode()
-            );
-
-            System.out.println(
-                    "Login Response: "
-                            + response.body()
-            );
+            HttpResponse<String> response = client.send(
+                    request,
+                    HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
-
-                JSONObject json =
-                        new JSONObject(response.body());
-
-                String uid =
-                        json.getString("localId");
-
-                String idToken =
-                        json.getString("idToken");
-
-                System.out.println(
-                        "LOGIN SUCCESS"
-                );
-
-                System.out.println(
-                        "Logged in UID: "
-                                + uid
-                );
-
+                JSONObject json = new JSONObject(response.body());
                 return new AuthResult(
                         true,
-                        uid,
-                        idToken,
-                        ""
-                );
+                        json.optString("localId", null),
+                        json.optString("idToken", null),
+                        "");
             }
 
-            JSONObject error =
-                    new JSONObject(response.body());
-
-            String message =
-                    "Login failed";
-
+            JSONObject error = new JSONObject(response.body());
+            String message = defaultError;
             if (error.has("error")) {
-
-                JSONObject errorObject =
-                        error.getJSONObject("error");
-
-                if (errorObject.has("message")) {
-
-                    message =
-                            errorObject.getString(
-                                    "message"
-                            );
-                }
+                JSONObject errorObject = error.getJSONObject("error");
+                message = errorObject.optString("message", defaultError);
             }
-
-            return new AuthResult(
-                    false,
-                    null,
-                    null,
-                    message
-            );
+            return new AuthResult(false, null, null, message);
 
         } catch (Exception e) {
-
             e.printStackTrace();
-
-            return new AuthResult(
-                    false,
-                    null,
-                    null,
-                    e.getMessage()
-            );
+            return new AuthResult(false, null, null, e.getMessage() == null ? defaultError : e.getMessage());
         }
     }
 
     public static class AuthResult {
-
         private final boolean success;
         private final String uid;
         private final String idToken;
         private final String errorMessage;
 
-        public AuthResult(
-                boolean success,
-                String uid,
-                String idToken,
-                String errorMessage) {
-
+        public AuthResult(boolean success, String uid, String idToken, String errorMessage) {
             this.success = success;
             this.uid = uid;
             this.idToken = idToken;
